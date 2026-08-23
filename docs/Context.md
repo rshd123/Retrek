@@ -51,3 +51,6 @@ The founder's investigation highlighted a common revenue-leakage problem:
 > Merchants closely monitor MRR, churn, activation, and other business metrics, but failed-payment recovery can remain invisible until someone manually investigates the logs.
 
 This led to the development of a dedicated recovery tool, demonstrating the underlying opportunity for an automated system that continuously identifies failed payments, determines which ones are recoverable, and takes the appropriate action.
+
+
+**Link:** https://razorpay.com/buildathon/
