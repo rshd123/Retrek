@@ -1,0 +1,102 @@
+[
+  {
+    "id": "pay_Kx9281a",
+    "amount": 2499.00,
+    "decline_code": "BANK_TIMEOUT_2FA",
+    "retry_count": 0,
+    "past_success_count": 5,
+    "status": "FAILED",
+    "customer_name": "Rahul Sharma",
+    "scenario": "Low ticket, temporary 2FA bank timeout (Candidate for Gate 1 Auto-Execute)"
+  },
+  {
+    "id": "pay_Tx4820b",
+    "amount": 15000.00,
+    "decline_code": "BANK_TIMEOUT_GATEWAY",
+    "retry_count": 0,
+    "past_success_count": 8,
+    "status": "FAILED",
+    "customer_name": "Ananya Roy",
+    "scenario": "High ticket (>= ₹10k), bank timeout (Candidate for Gate 2 Human Swipe Approval)"
+  },
+  {
+    "id": "pay_Mx1029c",
+    "amount": 4500.00,
+    "decline_code": "INSUFFICIENT_FUNDS",
+    "retry_count": 1,
+    "past_success_count": 2,
+    "status": "FAILED",
+    "customer_name": "Vikram Patel",
+    "scenario": "Insufficient funds, 1 previous retry (Candidate for Gate 2 Human Approval)"
+  },
+  {
+    "id": "pay_Fx3910d",
+    "amount": 8999.00,
+    "decline_code": "SUSPECTED_FRAUD",
+    "retry_count": 0,
+    "past_success_count": 0,
+    "status": "FAILED",
+    "customer_name": "Unknown Buyer",
+    "scenario": "Fraud risk flag detected (Candidate for Gate 3 Stop Rule)"
+  },
+  {
+    "id": "pay_Rx7721e",
+    "amount": 1999.00,
+    "decline_code": "BANK_TIMEOUT_2FA",
+    "retry_count": 3,
+    "past_success_count": 4,
+    "status": "FAILED",
+    "customer_name": "Sneha Gupta",
+    "scenario": "Max retry limit reached (3 attempts) (Candidate for Gate 3 Stop Rule)"
+  },
+  {
+    "id": "pay_Ex8823f",
+    "amount": 3200.00,
+    "decline_code": "EXPIRED_CARD",
+    "retry_count": 0,
+    "past_success_count": 12,
+    "status": "FAILED",
+    "customer_name": "Karan Malhotra",
+    "scenario": "Expired card for loyal customer (Needs payment link outreach)"
+  },
+  {
+    "id": "pay_Lx5432g",
+    "amount": 28500.00,
+    "decline_code": "CARD_LIMIT_EXCEEDED",
+    "retry_count": 0,
+    "past_success_count": 15,
+    "status": "FAILED",
+    "customer_name": "Enterprise Client",
+    "scenario": "Card limit exceeded on enterprise invoice (High-value Human Approval)"
+  },
+  {
+    "id": "pay_Nx9011h",
+    "amount": 499.00,
+    "decline_code": "PAYMENT_GATEWAY_DOWN",
+    "retry_count": 0,
+    "past_success_count": 1,
+    "status": "FAILED",
+    "customer_name": "Pooja Verma",
+    "scenario": "SaaS micro-subscription payment gateway glitch (Auto-Execute candidate)"
+  },
+  {
+    "id": "pay_Ox6754i",
+    "amount": 12500.00,
+    "decline_code": "ISSUER_DECLINED_GENERIC",
+    "retry_count": 1,
+    "past_success_count": 3,
+    "status": "FAILED",
+    "customer_name": "Amitabh Das",
+    "scenario": "Generic issuer decline, medium confidence (Human Approval candidate)"
+  },
+  {
+    "id": "pay_Bx1122j",
+    "amount": 9.00,
+    "decline_code": "MICRO_TRANSACTION_FAILED",
+    "retry_count": 0,
+    "past_success_count": 0,
+    "status": "FAILED",
+    "customer_name": "Solo Founder SaaS Customer",
+    "scenario": "Micro-transaction $9 failure from SaaS real-world case study"
+  }
+]
