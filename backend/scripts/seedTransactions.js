@@ -21,6 +21,7 @@ async function seedDatabase() {
       retry_count: tx.retry_count,
       past_success_count: tx.past_success_count,
       status: tx.status,
+      customer_name: tx.customer_name,
     });
 
     if (error) {

@@ -1,6 +1,9 @@
 import "dotenv/config";
 import express from "express";
+import cors from "cors";
+import { requireAuth } from "./middleware/auth.js";
 import healthRoutes from "./routes/health.js";
+import authRoutes from "./routes/auth.js";
 import aiRoutes from "./routes/ai.js";
 import transactionRoutes from "./routes/transactions.js";
 import webhookRoutes from "./routes/webhooks.js";
@@ -11,18 +14,22 @@ import benchmarkRoutes from "./routes/benchmark.js";
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+app.use(cors());
 app.use(express.json());
 
-// Routes
+// Public routes (no auth required)
 app.use("/api", healthRoutes);
-app.use("/ai", aiRoutes);
-app.use("/api/ai", aiRoutes);
-app.use("/api/transactions", transactionRoutes);
+app.use("/api/auth", authRoutes);
+
+// Protected routes (JWT auth required)
+app.use("/ai", requireAuth, aiRoutes);
+app.use("/api/ai", requireAuth, aiRoutes);
+app.use("/api/transactions", requireAuth, transactionRoutes);
 app.use("/api/webhooks", webhookRoutes);
-app.use("/api/audit-logs", auditRoutes);
-app.use("/api/dashboard", auditRoutes);
-app.use("/api/approvals", approvalRoutes);
-app.use("/api/benchmark", benchmarkRoutes);
+app.use("/api/audit-logs", requireAuth, auditRoutes);
+app.use("/api/dashboard", requireAuth, auditRoutes);
+app.use("/api/approvals", requireAuth, approvalRoutes);
+app.use("/api/benchmark", requireAuth, benchmarkRoutes);
 
 app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);

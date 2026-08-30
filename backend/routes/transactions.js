@@ -94,7 +94,7 @@ async function processTransaction(transactionId) {
   };
 }
 
-// POST /api/transactions/seed — Seed synthetic data and process each transaction
+// POST /api/transactions/seed — Seed synthetic data into DB
 router.post("/seed", async (req, res) => {
   try {
     const dataPath = path.join(__dirname, "../data/batch_transactions.json");
@@ -109,7 +109,6 @@ router.post("/seed", async (req, res) => {
     const rawData = fs.readFileSync(dataPath, "utf-8");
     const transactions = JSON.parse(rawData);
 
-    // Step 1: Seed all transactions into DB
     const seededIds = [];
     for (const tx of transactions) {
       const { error } = await supabase.from("transactions").upsert({
@@ -128,35 +127,9 @@ router.post("/seed", async (req, res) => {
       seededIds.push(tx.id);
     }
 
-    // Step 2: Process each transaction through the real-time pipeline
-    const results = [];
-    for (const txId of seededIds) {
-      try {
-        const result = await processTransaction(txId);
-        results.push(result);
-      } catch (processError) {
-        console.error(`Processing failed for ${txId}:`, processError.message);
-        results.push({
-          transaction_id: txId,
-          error: processError.message,
-        });
-      }
-    }
-
-    // Summarize decisions
-    const summary = {
-      total: results.length,
-      auto_execute: results.filter((r) => r.gate_decision === "AUTO_EXECUTE").length,
-      human_approval: results.filter((r) => r.gate_decision === "HUMAN_APPROVAL").length,
-      stopped: results.filter((r) => r.gate_decision === "STOP_RULE").length,
-      failed: results.filter((r) => r.error).length,
-    };
-
     res.json({
       success: true,
-      message: `Seeded and processed ${seededIds.length} transactions.`,
-      summary,
-      results,
+      message: `Seeded ${seededIds.length} transactions.`,
     });
   } catch (error) {
     res.status(500).json({

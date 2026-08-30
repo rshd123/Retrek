@@ -22,7 +22,7 @@ async function main() {
         "│"
     );
     console.log(
-      `│  ⚡ 2. Webhook Deduplication Rate        : [ ${pillars.pillar_2_webhook_idempotency.status} ] ${pillars.pillar_2_webhook_idempotency.score}`.padEnd(83) +
+      `│   2. Webhook Deduplication Rate        : [ ${pillars.pillar_2_webhook_idempotency.status} ] ${pillars.pillar_2_webhook_idempotency.score}`.padEnd(83) +
         "│"
     );
     console.log(

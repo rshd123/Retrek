@@ -6,7 +6,7 @@
     "retry_count": 0,
     "past_success_count": 5,
     "status": "FAILED",
-    "customer_name": "Rahul Sharma",
+    "customer_name": null,
     "scenario": "Low ticket, temporary 2FA bank timeout (Candidate for Gate 1 Auto-Execute)"
   },
   {
@@ -16,7 +16,7 @@
     "retry_count": 0,
     "past_success_count": 8,
     "status": "FAILED",
-    "customer_name": "Ananya Roy",
+    "customer_name": null,
     "scenario": "High ticket (>= ₹10k), bank timeout (Candidate for Gate 2 Human Swipe Approval)"
   },
   {
@@ -26,7 +26,7 @@
     "retry_count": 1,
     "past_success_count": 2,
     "status": "FAILED",
-    "customer_name": "Vikram Patel",
+    "customer_name": null,
     "scenario": "Insufficient funds, 1 previous retry (Candidate for Gate 2 Human Approval)"
   },
   {
@@ -36,7 +36,7 @@
     "retry_count": 0,
     "past_success_count": 0,
     "status": "FAILED",
-    "customer_name": "Unknown Buyer",
+    "customer_name": null,
     "scenario": "Fraud risk flag detected (Candidate for Gate 3 Stop Rule)"
   },
   {
@@ -46,7 +46,7 @@
     "retry_count": 3,
     "past_success_count": 4,
     "status": "FAILED",
-    "customer_name": "Sneha Gupta",
+    "customer_name": null,
     "scenario": "Max retry limit reached (3 attempts) (Candidate for Gate 3 Stop Rule)"
   },
   {
@@ -56,7 +56,7 @@
     "retry_count": 0,
     "past_success_count": 12,
     "status": "FAILED",
-    "customer_name": "Karan Malhotra",
+    "customer_name": null,
     "scenario": "Expired card for loyal customer (Needs payment link outreach)"
   },
   {
@@ -66,7 +66,7 @@
     "retry_count": 0,
     "past_success_count": 15,
     "status": "FAILED",
-    "customer_name": "Enterprise Client",
+    "customer_name": null,
     "scenario": "Card limit exceeded on enterprise invoice (High-value Human Approval)"
   },
   {
@@ -76,7 +76,7 @@
     "retry_count": 0,
     "past_success_count": 1,
     "status": "FAILED",
-    "customer_name": "Pooja Verma",
+    "customer_name": null,
     "scenario": "SaaS micro-subscription payment gateway glitch (Auto-Execute candidate)"
   },
   {
@@ -86,7 +86,7 @@
     "retry_count": 1,
     "past_success_count": 3,
     "status": "FAILED",
-    "customer_name": "Amitabh Das",
+    "customer_name": null,
     "scenario": "Generic issuer decline, medium confidence (Human Approval candidate)"
   },
   {
@@ -96,7 +96,7 @@
     "retry_count": 0,
     "past_success_count": 0,
     "status": "FAILED",
-    "customer_name": "Solo Founder SaaS Customer",
+    "customer_name": null,
     "scenario": "Micro-transaction $9 failure from SaaS real-world case study"
   }
 ]

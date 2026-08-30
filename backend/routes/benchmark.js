@@ -268,7 +268,7 @@ export async function executeBenchmarkSuite() {
 // GET /api/benchmark/run — Trigger the automated benchmark suite
 router.get("/run", async (req, res) => {
   try {
-    console.log("⚡ Executing Retrek Automated Benchmark Suite...");
+    console.log(" Executing Retrek Automated Benchmark Suite...");
     const report = await executeBenchmarkSuite();
     res.json({
       success: true,
