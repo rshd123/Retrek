@@ -14,7 +14,6 @@ jobs:
           node-version: 24
       - run: npm install -g vercel
       - run: vercel --yes --prod
-        working-directory: backend
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
