@@ -9,7 +9,7 @@
 # Vercel auth token (keep secret), but allow project.json for CI/CD
 .vercel/**/*
 !.vercel/project.json
-backend/.vercel/**/*
-!backend/.vercel/project.json
 frontend/.vercel/**/*
 !frontend/.vercel/project.json
+
+

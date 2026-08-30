@@ -11,6 +11,8 @@
   - `/dashboard/approvals` → Approvals Queue → `src/pages/ApprovalsQueue.jsx`
   - `/dashboard/roi` → ROI & Metrics → `src/pages/ROIMetrics.jsx`
   - `/dashboard/audit` → Audit Trail → `src/pages/AuditTrail.jsx`
+  - `/dashboard/benchmark` → Benchmark & Evaluation → `src/pages/BenchmarkPage.jsx`
+  - `/dashboard/system` → System Health & Diagnostics → `src/pages/SystemHealth.jsx`
 
 ## Planned
 
@@ -21,13 +23,5 @@
 2. `/dashboard/ingest` → Manual Transaction Ingest
    - `POST /api/transactions/ingest`
 
-3. `/dashboard/system` → System Health
-   - `GET /api/health`
-   - `GET /api/ai/llmTest`
-
-4. `/dashboard/benchmark` → Benchmark & Performance
-   - `GET /api/benchmark/run`
-   - `GET /api/benchmark/results`
-
-5. `/dashboard/users` → User Management
+3. `/dashboard/users` → User Management
    - `GET /api/auth/users`

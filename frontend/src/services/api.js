@@ -131,4 +131,18 @@ export const api = {
     const query = new URLSearchParams(params).toString();
     return request(`/audit-logs/logs${query ? `?${query}` : ''}`, { method: 'GET' });
   },
+
+  // Benchmark
+  async runBenchmark() {
+    return request('/benchmark/run', { method: 'GET' });
+  },
+
+  async getBenchmarkResults() {
+    return request('/benchmark/results', { method: 'GET' });
+  },
+
+  // Health
+  async getHealth() {
+    return request('/health', { method: 'GET' });
+  },
 };

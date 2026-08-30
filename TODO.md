@@ -34,25 +34,19 @@
 - [x] **Wire `TransactionsView.jsx` into `TransactionsPage.jsx`**
   - **File:** `frontend/src/pages/TransactionsPage.jsx`
   - **Task:** Replace the static table in `TransactionsPage.jsx` with the rich `TransactionsView.jsx` component to enable searching, status filtering, transaction inspection modal, and direct AI recovery triggers.
-- [ ] **Build Approvals Queue (`ApprovalsQueue.jsx`)**
-  - **File:** `frontend/src/pages/ApprovalsQueue.jsx`
-  - **Features:**
-    - Mobile-first Swipe-to-Approve card deck (Tinder-style swipe right to approve, swipe left to decline).
-    - Desktop card list with one-click **Approve** (generates Razorpay link) and **Decline** (stops recovery).
-    - Display ISO-8583 banking ontology diagnosis, recovery probability score, and drafted Hinglish SMS/WhatsApp message.
-- [ ] **Build ROI & Analytics View (`ROIMetrics.jsx`)**
+- [x] **Build ROI & Analytics View (`ROIMetrics.jsx`)**
   - **File:** `frontend/src/pages/ROIMetrics.jsx`
   - **Features:**
     - Revenue recovery funnel: Total At Risk vs. Recovered vs. Stopped.
     - Policy Gate Distribution chart: Gate 1 (Auto-Execute) vs. Gate 2 (Human Approval) vs. Gate 3 (Stop Rule).
     - Recovery rate timeline and average latency metrics (Policy Engine <50ms vs. LLM inference).
-- [ ] **Build Audit Trail & Provenance Ledger (`AuditTrail.jsx`)**
+- [x] **Build Audit Trail & Provenance Ledger (`AuditTrail.jsx`)**
   - **File:** `frontend/src/pages/AuditTrail.jsx`
   - **Features:**
     - Searchable table of all audit records from `GET /api/audit-logs/logs`.
     - Filters by gate decision (`AUTO_EXECUTE`, `HUMAN_APPROVAL`, `STOP_RULE`) and decline code.
     - Expandable modal showing full immutable JSONB `ai_reasoning` trace (model latency, ISO ontology mapping, prompt token telemetry).
-- [ ] **Build Benchmark & Evaluation Runner View (`BenchmarkPage.jsx`)**
+- [x] **Build Benchmark & Evaluation Runner View (`BenchmarkPage.jsx`)**
   - **Route:** `/dashboard/benchmark`
   - **Features:**
     - "Run Live Benchmark" button that triggers `GET /api/benchmark/run`.
@@ -62,7 +56,7 @@
       3. Policy Evaluation Latency (<50ms SLA).
       4. Audit Provenance Coverage (100%).
     - Batch scenario breakdown table showing each test case result.
-- [ ] **Build System Health & Diagnostics View (`SystemHealth.jsx`)**
+- [x] **Build System Health & Diagnostics View (`SystemHealth.jsx`)**
   - **Route:** `/dashboard/system`
   - **Features:**
     - Live connection indicator for Supabase Database and Groq LLM inference (`qwen/qwen3.6-27b`).
@@ -107,4 +101,3 @@
 - [ ] **Adversarial Fraud Refusal:** Ingest `SUSPECTED_FRAUD` / `STOLEN_CARD` transaction ? verify 0 payment links created and immediate routing to `STOP_RULE`.
 - [ ] **Concurrency Webhook Idempotency:** Fire 10 simultaneous webhook events ? verify exactly 1 succeeds and 9 are rejected via PostgreSQL primary key lock.
 - [ ] **Benchmark Suite Execution:** Execute `node backend/scripts/runBenchmark.js` and verify all tests pass with full provenance.
-

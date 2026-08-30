@@ -268,26 +268,6 @@
   margin: 0;
 }
 
-.hero-cta-group {
-  display: flex;
-  gap: 16px;
-  margin-top: 16px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.hero-btn-primary {
-  min-height: 48px;
-  padding: 0 28px;
-  font-size: 17px;
-}
-
-.hero-btn-secondary {
-  border: 1px solid rgba(23, 79, 67, 0.3);
-  color: var(--text);
-  padding: 0 24px;
-}
-
 .badge {
   display: inline-flex;
   align-items: center;
@@ -297,22 +277,6 @@
   font-weight: 600;
   background: rgba(131, 184, 61, 0.2);
   color: #174f43;
-}
-
-.badge-accent {
-  background: rgba(154, 223, 0, 0.25);
-  color: #174f43;
-}
-
-.badge-warning {
-  background: rgba(220, 100, 30, 0.15);
-  color: #a84200;
-}
-
-.user-greeting {
-  color: #f6f4ec;
-  font-size: 15px;
-  margin-right: 6px;
 }
 
 /* Auth Pages (Signup & Login) */
@@ -1105,7 +1069,7 @@
 
 .data-table th {
   background: #f8f7f1;
-  padding: 14px 20px;
+  padding: 10px 16px;
   font-weight: 700;
   font-size: 12px;
   text-transform: uppercase;
@@ -1117,7 +1081,7 @@
 }
 
 .data-table td {
-  padding: 16px 20px;
+  padding: 10px 16px;
   border-bottom: 1px solid rgba(23, 79, 67, 0.06);
   color: var(--text);
   vertical-align: middle;

@@ -81,10 +81,10 @@ router.post("/razorpay", async (req, res) => {
       }
     }
 
-    // Handle payment_link.failed — payment failed, trigger real-time recovery pipeline
-    if (eventType === "payment_link.failed") {
+    // Handle payment_link.expired / payment_link.cancelled — payment failed, trigger recovery pipeline
+    if (eventType === "payment_link.expired" || eventType === "payment_link.cancelled") {
       if (referenceId) {
-        console.log(`❌ Payment failed for ${referenceId} — triggering recovery pipeline`);
+        console.log(`❌ Payment ${eventType} for ${referenceId} — triggering recovery pipeline`);
 
         // Fetch the transaction
         const { data: transaction } = await supabase
@@ -134,7 +134,7 @@ router.post("/razorpay", async (req, res) => {
               ...diagnosis,
               policy_reason: policy.reason,
               action_taken: actionTaken,
-              trigger: "webhook_payment_failed",
+              trigger: `webhook_${eventType}`,
             },
           });
 

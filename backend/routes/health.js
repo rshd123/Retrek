@@ -58,6 +58,25 @@ router.get("/health", async (req, res) => {
     services.llm.error = err.message;
   }
 
+  // 3. Test Razorpay API Connectivity
+  const rzStartTime = Date.now();
+  try {
+    const creds = Buffer.from(`${process.env.TEST_API_KEY}:${process.env.RAZORPAY_KEY_SECRET}`).toString("base64");
+    const rzResp = await fetch("https://api.razorpay.com/v1/payment_links", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Basic ${creds}` },
+      body: JSON.stringify({ amount: 100, currency: "INR", description: "Retrek health check" }),
+    });
+    const rzData = await rzResp.json();
+    services.razorpay = {
+      status: rzResp.ok ? "connected" : "error",
+      latencyMs: Date.now() - rzStartTime,
+      ...(rzResp.ok ? { short_url: rzData.short_url } : { error: rzData.error?.description || "Unknown error" }),
+    };
+  } catch (err) {
+    services.razorpay = { status: "disconnected", latencyMs: Date.now() - rzStartTime, error: err.message };
+  }
+
   const isHealthy = services.database.status === "connected" && services.llm.status === "connected";
   const overallStatus = isHealthy ? "healthy" : (services.database.status === "connected" || services.llm.status === "connected" ? "degraded" : "unhealthy");
 

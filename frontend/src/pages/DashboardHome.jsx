@@ -95,9 +95,6 @@ export default function DashboardHome({ navigate, seedVersion }) {
         <button className="btn btn-primary" onClick={() => navigate('/dashboard/transactions')}>
           View Transactions
         </button>
-        <button className="btn btn-outline" onClick={() => navigate('/dashboard/approvals')} style={{ border: '1px solid rgba(23,79,67,0.2)', color: 'var(--text)' }}>
-          Approvals Queue {pendingApprovals > 0 && `(${pendingApprovals})`}
-        </button>
         <button className="btn btn-outline" onClick={() => navigate('/dashboard/roi')} style={{ border: '1px solid rgba(23,79,67,0.2)', color: 'var(--text)' }}>
           ROI & Metrics
         </button>

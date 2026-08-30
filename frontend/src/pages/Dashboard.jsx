@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../services/api';
 import DashboardHome from './DashboardHome';
 import ROIMetrics from './ROIMetrics';
-import ApprovalsQueue from './ApprovalsQueue';
 import TransactionsPage from './TransactionsPage';
 import AuditTrail from './AuditTrail';
+import BenchmarkPage from './BenchmarkPage';
+import SystemHealth from './SystemHealth';
 
 const SIDEBAR_ITEMS = [
   { key: 'home', label: 'Dashboard', path: '/dashboard', icon: (
@@ -21,13 +21,6 @@ const SIDEBAR_ITEMS = [
       <line x1="6" y1="20" x2="6" y2="14" />
     </svg>
   )},
-  { key: 'approvals', label: 'Approvals Queue', path: '/dashboard/approvals', icon: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="9" y1="15" x2="15" y2="15" />
-    </svg>
-  )},
   { key: 'transactions', label: 'Transactions', path: '/dashboard/transactions', icon: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <rect x="2" y="5" width="20" height="14" rx="2" />
@@ -37,6 +30,19 @@ const SIDEBAR_ITEMS = [
   { key: 'audit', label: 'Audit Trail', path: '/dashboard/audit', icon: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  )},
+  { key: 'benchmark', label: 'Benchmark', path: '/dashboard/benchmark', icon: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  )},
+  { key: 'system', label: 'System Health', path: '/dashboard/system', icon: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+      <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+      <line x1="6" y1="6" x2="6.01" y2="6" />
+      <line x1="6" y1="18" x2="6.01" y2="18" />
     </svg>
   )},
 ];
@@ -50,8 +56,7 @@ function getActiveKey(path) {
 
 export default function Dashboard({ navigate, currentPath }) {
   const { user, logout } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [seedVersion, setSeedVersion] = useState(0);
+  const [seedVersion] = useState(0);
   const [toast, setToast] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -74,12 +79,14 @@ export default function Dashboard({ navigate, currentPath }) {
         return <DashboardHome navigate={navigate} seedVersion={seedVersion} />;
       case 'roi':
         return <ROIMetrics />;
-      case 'approvals':
-        return <ApprovalsQueue />;
       case 'transactions':
         return <TransactionsPage seedVersion={seedVersion} />;
       case 'audit':
         return <AuditTrail />;
+      case 'benchmark':
+        return <BenchmarkPage />;
+      case 'system':
+        return <SystemHealth />;
       default:
         return <DashboardHome navigate={navigate} seedVersion={seedVersion} />;
     }

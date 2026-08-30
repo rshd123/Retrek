@@ -89,8 +89,4 @@ API call → Authorization: Bearer <token> → middleware verifies → request p
 
 ---
 
-## 12. What's Left (TODO)
-- ❌ **Frontend (React + TailwindCSS)** — Initialized, no components built yet
-- ❌ **Supabase Realtime subscriptions** — Dashboard not built yet
-- ❌ **Mobile PWA (Swipe-to-Approve)** — Not started
-- ❌ **ngrok / webhook live integration** — Needs setup for real-time Razorpay demo
+
