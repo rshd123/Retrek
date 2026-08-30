@@ -138,7 +138,7 @@ router.post("/razorpay", async (req, res) => {
             },
           });
 
-          console.log(`📋 ${referenceId} | Re-processed after failure | ${policy.gate_decision} | ₹${transaction.amount}`);
+          console.log(` ${referenceId} | Re-processed after failure | ${policy.gate_decision} | ₹${transaction.amount}`);
         }
       }
     }

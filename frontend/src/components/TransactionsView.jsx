@@ -12,6 +12,7 @@ export default function TransactionsView({
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedTx, setSelectedTx] = useState(null);
   const [processingId, setProcessingId] = useState(null);
+  const [batchProcessing, setBatchProcessing] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
 
   // Compute summary stats
@@ -53,13 +54,15 @@ export default function TransactionsView({
         (tx.id && tx.id.toLowerCase().includes(query)) ||
         (tx.customer_name && tx.customer_name.toLowerCase().includes(query)) ||
         (tx.decline_code && tx.decline_code.toLowerCase().includes(query)) ||
-        (tx.status && tx.status.toLowerCase().includes(query));
+        (tx.status && tx.status.toLowerCase().includes(query)) ||
+        (tx.gate_decision && tx.gate_decision.toLowerCase().includes(query));
 
       return matchesStatus && matchesSearch;
     });
   }, [transactions, statusFilter, searchQuery]);
 
   const copyToClipboard = (text, id) => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -69,18 +72,38 @@ export default function TransactionsView({
     setProcessingId(id);
     try {
       const res = await api.processTransaction(id);
+      const data = res.data || {};
       setMessage({
         type: 'success',
-        text: `Transaction ${id} processed! Gate Decision: ${res.data?.gate_decision || 'Evaluated'}`
+        text: `Transaction ${id} diagnosed! Gate: ${data.gate_decision || 'EVALUATED'} (Prob: ${(Number(data.recovery_probability || 0) * 100).toFixed(0)}%)`
       });
-      if (selectedTx?.id === id) {
-        setSelectedTx((prev) => ({ ...prev, ...res.data, status: res.data?.status || prev.status }));
-      }
       if (onRefresh) onRefresh();
+      setSelectedTx((prev) => {
+        if (prev?.id === id) {
+          return { ...prev, ...data, status: data.status || prev.status };
+        }
+        return { ...prev, ...data, id };
+      });
     } catch (err) {
       setMessage({ type: 'error', text: err.message || 'Processing failed' });
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  const handleBatchProcess = async () => {
+    setBatchProcessing(true);
+    try {
+      const res = await api.batchProcessTransactions();
+      setMessage({
+        type: 'success',
+        text: res.message || `Processed ${res.processed_count || 0} failed transactions through AI pipeline!`
+      });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Batch processing failed' });
+    } finally {
+      setBatchProcessing(false);
     }
   };
 
@@ -102,7 +125,7 @@ export default function TransactionsView({
     setProcessingId(id);
     try {
       await api.declineTransaction(id, 'Declined via Transactions management');
-      setMessage({ type: 'success', text: `Transaction ${id} declined and stopped.` });
+      setMessage({ type: 'success', text: `Transaction ${id} declined and recovery stopped.` });
       if (onRefresh) onRefresh();
       if (selectedTx?.id === id) setSelectedTx(null);
     } catch (err) {
@@ -117,6 +140,21 @@ export default function TransactionsView({
     return code.replace(/_/g, ' ');
   };
 
+  const getGateBadgeClass = (gate) => {
+    if (!gate) return 'badge-neutral';
+    switch (gate.toUpperCase()) {
+      case 'AUTO_EXECUTE':
+        return 'badge-gate-auto';
+      case 'HUMAN_APPROVAL':
+        return 'badge-gate-human';
+      case 'STOP_RULE':
+      case 'SAFETY_REFUSED':
+        return 'badge-gate-stop';
+      default:
+        return 'badge-neutral';
+    }
+  };
+
   return (
     <div className="tab-view">
       {/* Top Header */}
@@ -124,14 +162,14 @@ export default function TransactionsView({
         <div>
           <h2 className="view-title">Merchant Transactions Ledger</h2>
           <p className="view-subtitle">
-            Live telemetry of all customer transactions, dunning interventions, and autonomous recovery states
+            Autonomous AI failure diagnosis, ISO-8583 mapping, deterministic safety gates, and payment recovery
           </p>
         </div>
-        <div className="header-actions-group">
+        <div className="header-actions-group" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
             className="btn btn-outline"
             onClick={onRefresh}
-            disabled={loading}
+            disabled={loading || batchProcessing}
             title="Reload transaction list"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}>
@@ -139,13 +177,29 @@ export default function TransactionsView({
             </svg>
             Refresh
           </button>
+
+          {stats.failedCount > 0 && (
+            <button
+              className="btn btn-success"
+              onClick={handleBatchProcess}
+              disabled={loading || batchProcessing}
+              title="Process all unresolved FAILED transactions through AI recovery engine"
+            >
+              {batchProcessing ? (
+                <span>Diagnosing ({stats.failedCount})...</span>
+              ) : (
+                <span>AI Recover All ({stats.failedCount})</span>
+              )}
+            </button>
+          )}
+
           <button
             className="btn btn-primary"
             onClick={onSeed}
-            disabled={loading}
+            disabled={loading || batchProcessing}
             title="Seed synthetic transactions to test AI recovery"
           >
-            {loading ? 'Processing...' : ' Seed 10 Test Cases'}
+            {loading ? 'Processing...' : 'Seed 10 Test Cases'}
           </button>
         </div>
       </div>
@@ -155,25 +209,25 @@ export default function TransactionsView({
         <div className="metric-card">
           <span className="metric-label">Total Transactions</span>
           <span className="metric-value">{stats.totalCount}</span>
-          <span className="metric-sub">Volume: ₹{stats.totalAmount.toLocaleString()}</span>
+          <span className="metric-sub">Volume: ₹{stats.totalAmount.toLocaleString('en-IN')}</span>
         </div>
 
         <div className="metric-card metric-card-highlight">
           <span className="metric-label">Capital Recovered</span>
-          <span className="metric-value text-green">₹{stats.recoveredAmount.toLocaleString()}</span>
-          <span className="metric-sub">{stats.recoveredCount} payment(s) successfully won back</span>
+          <span className="metric-value text-green">₹{stats.recoveredAmount.toLocaleString('en-IN')}</span>
+          <span className="metric-sub">{stats.recoveredCount} payment(s) won back</span>
         </div>
 
         <div className="metric-card">
           <span className="metric-label">In Dunning Pipeline</span>
           <span className="metric-value" style={{ color: '#2b6cb0' }}>{stats.linkSentCount}</span>
-          <span className="metric-sub">Smart recovery payment links sent</span>
+          <span className="metric-sub">Active payment recovery links</span>
         </div>
 
         <div className="metric-card">
           <span className="metric-label">Pending Approval</span>
           <span className="metric-value" style={{ color: '#dd6b20' }}>{stats.pendingCount}</span>
-          <span className="metric-sub">Awaiting merchant review</span>
+          <span className="metric-sub">High-ticket review queue</span>
         </div>
       </div>
 
@@ -187,13 +241,13 @@ export default function TransactionsView({
           <input
             type="text"
             className="tx-search-input"
-            placeholder="Search by ID, customer name, decline code..."
+            placeholder="Search by ID, customer name, decline code, or gate decision..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           {searchQuery && (
             <button className="clear-search-btn" onClick={() => setSearchQuery('')}>
-              ×
+              �
             </button>
           )}
         </div>
@@ -202,11 +256,11 @@ export default function TransactionsView({
         <div className="tx-status-filters">
           {[
             { key: 'ALL', label: 'All', count: stats.totalCount },
-            { key: 'RECOVERED', label: 'Recovered', count: stats.recoveredCount },
+            { key: 'FAILED', label: 'Failed (Unprocessed)', count: stats.failedCount },
             { key: 'LINK_SENT', label: 'Link Sent', count: stats.linkSentCount },
             { key: 'PENDING_APPROVAL', label: 'Pending Approval', count: stats.pendingCount },
-            { key: 'FAILED', label: 'Failed', count: stats.failedCount },
-            { key: 'STOPPED', label: 'Stopped / Refused', count: stats.stoppedCount },
+            { key: 'RECOVERED', label: 'Recovered', count: stats.recoveredCount },
+            { key: 'STOPPED', label: 'Stopped / Fraud', count: stats.stoppedCount },
           ].map((item) => (
             <button
               key={item.key}
@@ -224,10 +278,10 @@ export default function TransactionsView({
         <div className="empty-state">
           {transactions.length === 0 ? (
             <div>
-              <p style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>No transactions recorded in your account yet.</p>
-              <p style={{ marginBottom: '16px' }}>Click below to seed synthetic merchant transactions and test the real-time AI recovery engine.</p>
+              <p style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>No transactions recorded yet.</p>
+              <p style={{ marginBottom: '16px' }}>Click below to seed 10 synthetic real-world merchant failure scenarios and test the AI diagnosis engine.</p>
               <button className="btn btn-primary" onClick={onSeed} disabled={loading}>
-                {loading ? 'Processing...' : ' Seed 10 Test Cases'}
+                {loading ? 'Processing...' : 'Seed 10 Test Cases'}
               </button>
             </div>
           ) : (
@@ -242,120 +296,136 @@ export default function TransactionsView({
       ) : (
         <div className="table-wrapper">
           <table className="data-table">
+            <colgroup>
+              <col className="col-id" />
+              <col className="col-customer" />
+              <col className="col-amount" />
+              <col className="col-decline" />
+              <col className="col-gate" />
+              <col className="col-status" />
+              <col className="col-action" />
+            </colgroup>
             <thead>
               <tr>
                 <th>Transaction ID</th>
-                <th>Customer Name</th>
+                <th>Customer</th>
                 <th>Amount</th>
-                <th>Decline Reason</th>
-                <th>Attempts</th>
+                <th>Decline Reason / ISO</th>
+                <th>AI Decision Gate</th>
                 <th>Status</th>
-                <th>Timestamp</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {filteredTransactions.map((tx) => (
-                <tr key={tx.id} className="tx-row" onClick={() => setSelectedTx(tx)}>
-                  <td className="code-cell">
-                    <span className="tx-id-badge" title="Click to copy full ID" onClick={(e) => { e.stopPropagation(); copyToClipboard(tx.id, tx.id); }}>
-                      {tx.id.slice(0, 10)}...
-                      <span className="copy-indicator">{copiedId === tx.id ? '✓ Copied' : '📋'}</span>
-                    </span>
-                  </td>
-                  <td>
-                    {tx.customer_name ? (
-                      <div className="customer-cell">
-                        <div className="customer-avatar-sm">
-                          {tx.customer_name.charAt(0).toUpperCase()}
+              {filteredTransactions.map((tx) => {
+                const prob = tx.recovery_probability !== null && tx.recovery_probability !== undefined
+                  ? Number(tx.recovery_probability)
+                  : null;
+                const gate = tx.gate_decision || tx.ai_reasoning?.gate_decision;
+
+                return (
+                  <tr key={tx.id} className="tx-row" onClick={() => setSelectedTx(tx)}>
+                    <td className="code-cell td-card-header" data-label="Transaction ID">
+                      <span className="tx-id-badge" title="Click to copy full ID" onClick={(e) => { e.stopPropagation(); copyToClipboard(tx.id, tx.id); }}>
+                        {tx.id.slice(0, 12)}
+                        <span className="copy-indicator">{copiedId === tx.id ? '✓' : ''}</span>
+                      </span>
+                      <span className={`status-pill status-${(tx.status || 'unknown').toLowerCase()}`}>
+                        {(tx.status || 'unknown').replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td data-label="Customer">
+                      {tx.customer_name ? (
+                        <div>
+                          <div className="customer-name">{tx.customer_name}</div>
+                          <div className="customer-meta">
+                            Retries: {tx.retry_count || 0} · Past: {tx.past_success_count || 0}
+                          </div>
                         </div>
-                        <span className="customer-name font-bold">{tx.customer_name}</span>
+                      ) : (
+                        <span className="not-evaluated">—</span>
+                      )}
+                    </td>
+                    <td className="text-amount" data-label="Amount">
+                      ₹{Number(tx.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td data-label="Decline Reason">
+                      <span className={`badge-decline badge-${(tx.decline_code || 'generic').toLowerCase()}`}>
+                        {formatDeclineCode(tx.decline_code)}
+                      </span>
+                      {tx.iso_code && (
+                        <span className="decline-iso">{tx.iso_code}</span>
+                      )}
+                    </td>
+                    <td data-label="AI Decision Gate">
+                      {gate ? (
+                        <div className="gate-cell">
+                          <span className={`gate-pill ${getGateBadgeClass(gate)}`}>
+                            {gate.replace(/_/g, ' ')}
+                          </span>
+                          {prob !== null && (
+                            <span
+                              className="probability-text"
+                              style={{ color: prob >= 0.8 ? '#166534' : prob >= 0.5 ? '#92400e' : '#991b1b' }}
+                            >
+                              {(prob * 100).toFixed(0)}% viability
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="not-evaluated">Not evaluated</span>
+                      )}
+                    </td>
+                    <td className="td-standalone-status" data-label="Status">
+                      <span className={`status-pill status-${(tx.status || 'unknown').toLowerCase()}`}>
+                        {(tx.status || 'unknown').replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td data-label="Action">
+                      <div className="action-buttons" onClick={(e) => e.stopPropagation()}>
+                        {tx.status === 'PENDING_APPROVAL' ? (
+                          <button
+                            className="btn btn-sm btn-outline"
+                            onClick={() => setSelectedTx(tx)}
+                            title="Review diagnosis and decide"
+                          >
+                            Resolve
+                          </button>
+                        ) : (tx.status === 'FAILED' || tx.status === 'STOPPED') ? (
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={() => handleProcess(tx.id)}
+                            disabled={processingId === tx.id || batchProcessing}
+                            title="Run Groq AI diagnosis and Policy Gate"
+                          >
+                            {processingId === tx.id ? 'Thinking...' : 'AI Recover'}
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-sm btn-outline"
+                            onClick={() => setSelectedTx(tx)}
+                            title="View transaction details"
+                          >
+                            View
+                          </button>
+                        )}
                       </div>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
-                  </td>
-                  <td className="font-bold text-amount">
-                    ₹{Number(tx.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td>
-                    <span className={`badge-decline badge-${(tx.decline_code || 'generic').toLowerCase()}`}>
-                      {formatDeclineCode(tx.decline_code)}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="attempt-badge">
-                      Retry: <strong>{tx.retry_count || 0}</strong> | Past: <strong>{tx.past_success_count || 0}</strong>
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`status-pill status-${(tx.status || 'unknown').toLowerCase()}`}>
-                      {tx.status}
-                    </span>
-                  </td>
-                  <td className="text-muted">
-                    {new Date(tx.created_at || Date.now()).toLocaleString([], {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </td>
-                  <td>
-                    <div className="action-buttons" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className="btn btn-sm btn-outline"
-                        onClick={() => setSelectedTx(tx)}
-                        title="View complete transaction breakdown"
-                      >
-                        Inspect
-                      </button>
-                      {(tx.status === 'FAILED' || tx.status === 'STOPPED') && (
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={() => handleProcess(tx.id)}
-                          disabled={processingId === tx.id}
-                          title="Run AI Diagnosis and Recovery"
-                        >
-                          {processingId === tx.id ? '...' : 'AI Recover'}
-                        </button>
-                      )}
-                      {tx.status === 'PENDING_APPROVAL' && (
-                        <>
-                          <button
-                            className="btn btn-sm btn-success"
-                            onClick={() => handleApprove(tx.id)}
-                            disabled={processingId === tx.id}
-                            title="Approve recovery link"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            className="btn btn-sm btn-danger"
-                            onClick={() => handleDecline(tx.id)}
-                            disabled={processingId === tx.id}
-                            title="Stop recovery"
-                          >
-                            Decline
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Transaction Details Modal */}
+      {/* Rich AI Diagnosis & Transaction Details Modal */}
       {selectedTx && (
         <div className="modal-overlay" onClick={() => setSelectedTx(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content modal-content-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h3 className="modal-title">Transaction Details</h3>
+                <h3 className="modal-title">Autonomous AI Diagnosis & Recovery</h3>
                 <span className="modal-subtitle code-cell">{selectedTx.id}</span>
               </div>
               <button className="modal-close-btn" onClick={() => setSelectedTx(null)}>
@@ -363,11 +433,12 @@ export default function TransactionsView({
               </button>
             </div>
 
-            <div className="modal-body">
+            <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden' }}>
+              {/* Telemetry Summary Header */}
               <div className="modal-grid">
                 <div className="modal-info-group">
-                  <span className="modal-label">Customer Name</span>
-                  <span className="modal-val font-bold">{selectedTx.customer_name || 'Customer Name Unavailable'}</span>
+                  <span className="modal-label">Customer</span>
+                  <span className="modal-val font-bold">{selectedTx.customer_name || 'Customer'}</span>
                 </div>
                 <div className="modal-info-group">
                   <span className="modal-label">Amount</span>
@@ -382,42 +453,113 @@ export default function TransactionsView({
                   </span>
                 </div>
                 <div className="modal-info-group">
-                  <span className="modal-label">Decline Code</span>
-                  <span className="modal-val font-bold">{selectedTx.decline_code}</span>
-                </div>
-                <div className="modal-info-group">
                   <span className="modal-label">Retry Attempts</span>
                   <span className="modal-val">{selectedTx.retry_count || 0} attempt(s)</span>
                 </div>
                 <div className="modal-info-group">
-                  <span className="modal-label">Past Successful Orders</span>
+                  <span className="modal-label">Past Successes</span>
                   <span className="modal-val">{selectedTx.past_success_count || 0} order(s)</span>
+                </div>
+                <div className="modal-info-group">
+                  <span className="modal-label">Gateway Decline Code</span>
+                  <span className="modal-val font-bold" style={{ wordBreak: 'break-word' }}>
+                    {selectedTx.decline_code}
+                  </span>
                 </div>
               </div>
 
-              {selectedTx.scenario && (
-                <div className="modal-section-box">
-                  <span className="modal-label">Scenario Context</span>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>{selectedTx.scenario}</p>
+              {/* 1. Cognitive AI Diagnosis Block */}
+              <div className="modal-section-box" style={{ background: '#f8fafc', borderLeft: '4px solid #3b82f6', marginTop: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span className="modal-label" style={{ color: '#1e40af', fontWeight: '700', fontSize: '13px' }}>
+                    Cognitive LLM Diagnosis (ISO-8583 Mapping)
+                  </span>
+                  {selectedTx.recovery_probability !== null && selectedTx.recovery_probability !== undefined && (
+                    <span className="status-pill" style={{ background: '#dbeafe', color: '#1e40af', fontWeight: '700' }}>
+                      P(recovery): {(Number(selectedTx.recovery_probability) * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+
+                {selectedTx.iso_code && (
+                  <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '600', color: '#334155' }}>
+                    Standard: <span style={{ fontFamily: 'monospace', color: '#0284c7' }}>{selectedTx.iso_code}</span>
+                  </p>
+                )}
+
+                <p style={{ margin: '0 0 6px 0', fontSize: '14px', color: '#1e293b' }}>
+                  <strong>Root Cause:</strong> {selectedTx.root_cause || selectedTx.ai_reasoning?.root_cause || 'Click "AI Recover" to diagnose root cause with Groq LLM.'}
+                </p>
+
+                {selectedTx.ai_reasoning?.reasoning_summary && (
+                  <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
+                    Reasoning: {selectedTx.ai_reasoning.reasoning_summary}
+                  </p>
+                )}
+              </div>
+
+              {/* 2. Deterministic Policy Gate Block */}
+              <div className="modal-section-box" style={{ background: '#fcfaf6', borderLeft: '4px solid #f59e0b', marginTop: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span className="modal-label" style={{ color: '#b45309', fontWeight: '700', fontSize: '13px' }}>
+                    Deterministic Safety Policy Gate
+                  </span>
+                  {selectedTx.gate_decision && (
+                    <span className={`gate-pill ${getGateBadgeClass(selectedTx.gate_decision)}`}>
+                      {selectedTx.gate_decision}
+                    </span>
+                  )}
+                </div>
+                <p style={{ margin: '0', fontSize: '13px', color: '#451a03' }}>
+                  {selectedTx.policy_reason || selectedTx.ai_reasoning?.policy_reason || 'Safety rules evaluate amount thresholds (₹10,000 cap), fraud checks, and retry limits before link generation.'}
+                </p>
+              </div>
+
+              {/* 3. Culturally Tuned Hinglish Customer Outreach */}
+              {(selectedTx.customer_message_hinglish || selectedTx.ai_reasoning?.customer_message_hinglish) && (
+                <div className="modal-section-box" style={{ background: '#f0fdf4', borderLeft: '4px solid #10b981', marginTop: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span className="modal-label" style={{ color: '#047857', fontWeight: '700', fontSize: '13px' }}>
+                      Drafted Customer Outreach (Hinglish / English)
+                    </span>
+                    <button
+                      className="btn btn-sm btn-outline"
+                      style={{ fontSize: '11px', padding: '2px 8px' }}
+                      onClick={() => copyToClipboard(selectedTx.customer_message_hinglish || selectedTx.ai_reasoning?.customer_message_hinglish, 'msg')}
+                    >
+                      {copiedId === 'msg' ? '✓ Copied' : 'Copy Text'}
+                    </button>
+                  </div>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#064e3b', background: '#ffffff', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1fae5' }}>
+                    "{selectedTx.customer_message_hinglish || selectedTx.ai_reasoning?.customer_message_hinglish}"
+                  </p>
+                  {selectedTx.customer_message_english && (
+                    <p style={{ margin: '0', fontSize: '12px', color: '#475569' }}>
+                      <em>EN:</em> "{selectedTx.customer_message_english}"
+                    </p>
+                  )}
                 </div>
               )}
 
+              {/* 4. Razorpay Test Recovery Payment Link */}
               {selectedTx.payment_link_url && (
-                <div className="modal-section-box highlight-box">
-                  <span className="modal-label text-green">Razorpay Recovery Payment Link</span>
+                <div className="modal-section-box highlight-box" style={{ marginTop: '12px' }}>
+                  <span className="modal-label text-green" style={{ fontWeight: '700' }}>
+                    Razorpay Bounded Payment Link (Idempotent)
+                  </span>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
                     <input
                       type="text"
                       readOnly
                       value={selectedTx.payment_link_url}
                       className="tx-search-input"
-                      style={{ fontSize: '13px', background: '#ffffff' }}
+                      style={{ fontSize: '13px', background: '#ffffff', fontFamily: 'monospace' }}
                     />
                     <button
                       className="btn btn-sm btn-outline"
                       onClick={() => copyToClipboard(selectedTx.payment_link_url, 'modal_link')}
                     >
-                      {copiedId === 'modal_link' ? '✓ Copied' : 'Copy'}
+                      {copiedId === 'modal_link' ? '✓ Copied' : 'Copy Link'}
                     </button>
                     <a
                       href={selectedTx.payment_link_url}
@@ -426,21 +568,21 @@ export default function TransactionsView({
                       className="btn btn-sm btn-primary"
                       style={{ textDecoration: 'none' }}
                     >
-                      Open
+                      Open Checkout ?
                     </a>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
               {(selectedTx.status === 'FAILED' || selectedTx.status === 'STOPPED') && (
                 <button
                   className="btn btn-primary"
                   onClick={() => handleProcess(selectedTx.id)}
-                  disabled={processingId === selectedTx.id}
+                  disabled={processingId === selectedTx.id || batchProcessing}
                 >
-                  {processingId === selectedTx.id ? 'Processing...' : 'Run Autonomous AI Recovery'}
+                  {processingId === selectedTx.id ? 'Running AI Engine...' : 'Run Autonomous AI Recovery'}
                 </button>
               )}
               {selectedTx.status === 'PENDING_APPROVAL' && (

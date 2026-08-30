@@ -6,7 +6,11 @@ import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+try {
+  dotenv.config({ path: path.resolve(__dirname, "../.env") });
+} catch {
+  // In Vercel serverless, rely on process.env
+}
 
 const groq = new Groq({ apiKey: process.env.LLM_API_KEY });
 
@@ -147,7 +151,8 @@ Output ONLY valid JSON, no markdown formatting.`;
         { role: "user", content: prompt }
       ],
       temperature: 0.2,
-      max_tokens: 3000,
+      max_tokens: 1500,
+      response_format: { type: "json_object" },
     });
 
     const latencyMs = Date.now() - startTime;

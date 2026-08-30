@@ -91,12 +91,20 @@ export const api = {
     return request('/transactions', { method: 'GET' });
   },
 
+  async getTransaction(id) {
+    return request(`/transactions/${id}`, { method: 'GET' });
+  },
+
   async seedTransactions() {
     return request('/transactions/seed', { method: 'POST' });
   },
 
   async processTransaction(id) {
     return request(`/transactions/${id}/process`, { method: 'POST' });
+  },
+
+  async batchProcessTransactions() {
+    return request('/transactions/batch-process', { method: 'POST' });
   },
 
   // Approvals

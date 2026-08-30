@@ -30,7 +30,7 @@ async function main() {
         "│"
     );
     console.log(
-      `│  📋 4. Audit Provenance Coverage          : [ ${pillars.pillar_4_audit_provenance.status} ] ${pillars.pillar_4_audit_provenance.score}`.padEnd(83) +
+      `│   4. Audit Provenance Coverage          : [ ${pillars.pillar_4_audit_provenance.status} ] ${pillars.pillar_4_audit_provenance.score}`.padEnd(83) +
         "│"
     );
     console.log("└" + "─".repeat(82) + "┘\n");

@@ -31,6 +31,12 @@ app.use("/api/dashboard", requireAuth, auditRoutes);
 app.use("/api/approvals", requireAuth, approvalRoutes);
 app.use("/api/benchmark", requireAuth, benchmarkRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
-});
+// Export for Vercel serverless
+export default app;
+
+// Run standalone server only when not on Vercel
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Backend running on http://localhost:${PORT}`);
+  });
+}

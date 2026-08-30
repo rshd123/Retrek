@@ -31,7 +31,7 @@ router.get("/logs", async (req, res) => {
 });
 
 // GET /api/dashboard/roi — Compute real-time ROI metrics
-router.get("/dashboard/roi", async (req, res) => {
+router.get(["/roi", "/dashboard/roi"], async (req, res) => {
   try {
     // Fetch all transactions for metrics
     const { data: transactions, error: txError } = await supabase

@@ -32,7 +32,7 @@ To guarantee sub-second latency and zero architectural complexity, the AI Engine
 
 ---
 
-## 📋 2. Detailed Pipeline Steps
+##  2. Detailed Pipeline Steps
 
 ### Step 1: Data Extraction & Normalization
 When a payment failure event arrives, the orchestrator normalizes the payload into standard telemetry:

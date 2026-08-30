@@ -11,6 +11,17 @@ const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function mapActionToStatus(actionTaken) {
+  if (!actionTaken) return null;
+  const action = actionTaken.toUpperCase();
+  if (action.includes("LINK_SENT")) return "LINK_SENT";
+  if (action.includes("FAILED")) return "LINK_FAILED";
+  if (action.includes("AUTO_EXECUTE")) return "LINK_SENT";
+  if (action.includes("HUMAN_APPROVAL") || action.includes("PENDING")) return "PENDING_APPROVAL";
+  if (action.includes("STOP")) return "STOPPED";
+  return null;
+}
+
 /**
  * Process a single transaction through the full real-time pipeline:
  * AI Diagnosis → Policy Gate → Act → Audit Log
@@ -55,13 +66,18 @@ async function processTransaction(transactionId) {
   }
 
   // 5. Update transaction status in DB
-  await supabase
+  const { error: updateError } = await supabase
     .from("transactions")
     .update({ status: newStatus })
     .eq("id", transactionId);
 
+  if (updateError) {
+    console.error(`DB update failed for ${transactionId}:`, updateError.message);
+    throw new Error(`Failed to update transaction status: ${updateError.message}`);
+  }
+
   // 6. Log to audit_logs
-  await supabase.from("audit_logs").insert({
+  const { error: auditError } = await supabase.from("audit_logs").insert({
     transaction_id: transactionId,
     decline_code: transaction.decline_code,
     recovery_probability: diagnosis.recovery_probability,
@@ -74,8 +90,12 @@ async function processTransaction(transactionId) {
     },
   });
 
+  if (auditError) {
+    console.error(`Audit log insert failed for ${transactionId}:`, auditError.message);
+  }
+
   console.log(
-    `📋 ${transactionId} | ${policy.gate_decision} | ₹${transaction.amount} | Prob: ${diagnosis.recovery_probability} | ${policy.reason}`
+    ` ${transactionId} | ${policy.gate_decision} | ₹${transaction.amount} | Prob: ${diagnosis.recovery_probability} | ${policy.reason}`
   );
 
   return {
@@ -182,6 +202,46 @@ router.post("/ingest", async (req, res) => {
   }
 });
 
+// POST /api/transactions/batch-process — Process all FAILED transactions through AI pipeline
+router.post("/batch-process", async (req, res) => {
+  try {
+    const { data: failedTransactions, error } = await supabase
+      .from("transactions")
+      .select("id")
+      .eq("status", "FAILED");
+
+    if (error) throw new Error(error.message);
+
+    if (!failedTransactions || failedTransactions.length === 0) {
+      return res.json({
+        success: true,
+        message: "No unprocessed FAILED transactions found.",
+        processed_count: 0,
+        results: [],
+      });
+    }
+
+    const results = [];
+    for (const tx of failedTransactions) {
+      try {
+        const result = await processTransaction(tx.id);
+        results.push({ id: tx.id, success: true, ...result });
+      } catch (err) {
+        results.push({ id: tx.id, success: false, error: err.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Processed ${results.length} transactions through autonomous AI recovery pipeline.`,
+      processed_count: results.length,
+      results,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // POST /api/transactions/:id/process — Process a single transaction through the full pipeline
 router.post("/:id/process", async (req, res) => {
   try {
@@ -195,35 +255,91 @@ router.post("/:id/process", async (req, res) => {
   }
 });
 
-// GET /api/transactions — Fetch all transactions
+// GET /api/transactions — Fetch all transactions enriched with latest AI diagnosis
 router.get("/", async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { data: transactions, error } = await supabase
       .from("transactions")
       .select("*")
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
 
-    res.json({ success: true, data });
+    // Fetch latest audit log for each transaction
+    const enriched = await Promise.all(
+      transactions.map(async (tx) => {
+        const { data: auditLog } = await supabase
+          .from("audit_logs")
+          .select("ai_reasoning, gate_decision, recovery_probability, created_at")
+          .eq("transaction_id", tx.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        // Use audit log status as fallback if DB update was blocked by RLS
+        const resolvedStatus = auditLog?.ai_reasoning?.action_taken
+          ? mapActionToStatus(auditLog.ai_reasoning.action_taken)
+          : tx.status;
+
+        return {
+          ...tx,
+          status: resolvedStatus,
+          gate_decision: auditLog?.gate_decision || null,
+          recovery_probability: auditLog?.recovery_probability ?? null,
+          ai_reasoning: auditLog?.ai_reasoning || null,
+          root_cause: auditLog?.ai_reasoning?.root_cause || null,
+          customer_message_hinglish: auditLog?.ai_reasoning?.customer_message_hinglish || null,
+          customer_message_english: auditLog?.ai_reasoning?.customer_message_english || null,
+          policy_reason: auditLog?.ai_reasoning?.policy_reason || null,
+          iso_code: auditLog?.ai_reasoning?.iso_code || null,
+          payment_link_url: tx.payment_link_url || auditLog?.ai_reasoning?.payment_link_url || null,
+        };
+      })
+    );
+
+    res.json({ success: true, data: enriched });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// GET /api/transactions/:id — Fetch a single transaction
+// GET /api/transactions/:id — Fetch a single transaction enriched with AI diagnosis
 router.get("/:id", async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { data: tx, error } = await supabase
       .from("transactions")
       .select("*")
       .eq("id", req.params.id)
       .single();
 
     if (error) throw new Error(error.message);
-    if (!data) return res.status(404).json({ success: false, error: "Transaction not found" });
+    if (!tx) return res.status(404).json({ success: false, error: "Transaction not found" });
 
-    res.json({ success: true, data });
+    const { data: auditLog } = await supabase
+      .from("audit_logs")
+      .select("ai_reasoning, gate_decision, recovery_probability, created_at")
+      .eq("transaction_id", tx.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const enriched = {
+      ...tx,
+      status: auditLog?.ai_reasoning?.action_taken
+        ? mapActionToStatus(auditLog.ai_reasoning.action_taken) || tx.status
+        : tx.status,
+      gate_decision: auditLog?.gate_decision || null,
+      recovery_probability: auditLog?.recovery_probability ?? null,
+      ai_reasoning: auditLog?.ai_reasoning || null,
+      root_cause: auditLog?.ai_reasoning?.root_cause || null,
+      customer_message_hinglish: auditLog?.ai_reasoning?.customer_message_hinglish || null,
+      customer_message_english: auditLog?.ai_reasoning?.customer_message_english || null,
+      policy_reason: auditLog?.ai_reasoning?.policy_reason || null,
+      iso_code: auditLog?.ai_reasoning?.iso_code || null,
+      payment_link_url: tx.payment_link_url || auditLog?.ai_reasoning?.payment_link_url || null,
+    };
+
+    res.json({ success: true, data: enriched });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

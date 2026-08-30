@@ -68,21 +68,6 @@ export default function Dashboard({ navigate, currentPath }) {
     navigate(path);
   };
 
-  const handleSeed = useCallback(async () => {
-    setLoading(true);
-    setToast(null);
-    setMobileMenuOpen(false);
-    try {
-      const res = await api.seedTransactions();
-      setToast({ type: 'success', text: res.message || 'Seeded 10 transactions.' });
-      setSeedVersion((v) => v + 1);
-    } catch (err) {
-      setToast({ type: 'error', text: err.message || 'Failed to seed transactions' });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const renderContent = () => {
     switch (activeKey) {
       case 'home':
@@ -170,16 +155,6 @@ export default function Dashboard({ navigate, currentPath }) {
               </button>
             ))}
           </nav>
-
-          <div className="sidebar-action-box">
-            <button
-              className="btn btn-primary full-width"
-              onClick={handleSeed}
-              disabled={loading}
-            >
-              {loading ? 'Processing...' : 'Seed 10 Test Cases'}
-            </button>
-          </div>
         </aside>
 
         {/* Content Area */}

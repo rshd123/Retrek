@@ -3,8 +3,7 @@
 ---
 
 ## 1. System & Health (Public)
-- ✅ **`GET /api/health`** — `routes/health.js` — Returns system operational status, cloud LLM connectivity, and Supabase database health.
-- ✅ **`GET /ai/llmTest`** — `routes/ai.js` — Performs a test ping to the cloud LLM service to verify API key validity and inference response.
+- ✅ **`GET /api/health`** — `routes/health.js` — Returns system operational status, cloud LLM connectivity, and Supabase database health without requiring authentication.
 
 ---
 
@@ -12,7 +11,8 @@
 - ✅ **`POST /api/auth/signup`** — `routes/auth.js` — Create a new user account. Input: `{ email, username, password }`. `email` is UNIQUE; `username` can be shared across different accounts. Returns user + JWT token.
 - ✅ **`POST /api/auth/login`** — `routes/auth.js` — Authenticate user. Input: `{ email, password }`. Returns user + JWT token.
 
-## 3. Authentication (Protected — requires Bearer token)
+## 3. Protected Endpoints (Requires Bearer token)
+- ✅ **`GET /api/ai/llmTest`** (or **`GET /ai/llmTest`**) — `routes/ai.js` — Performs a live inference test ping to Groq LLM to verify model output and latency.
 - ✅ **`GET /api/auth/me`** — `routes/auth.js` — Returns current logged-in user profile (`id`, `email`, `username`).
 - ✅ **`GET /api/auth/users`** — `routes/auth.js` — List all users (id, email, username, created_at). No password_hash exposed.
 
