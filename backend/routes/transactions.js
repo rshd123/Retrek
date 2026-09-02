@@ -102,6 +102,7 @@ async function processTransaction(transactionId) {
     transaction_id: transactionId,
     amount: transaction.amount,
     decline_code: transaction.decline_code,
+    scenario_type: transaction.scenario_type || "payment_degradation",
     gate_decision: policy.gate_decision,
     policy_reason: policy.reason,
     recovery_probability: diagnosis.recovery_probability,
@@ -139,6 +140,7 @@ router.post("/seed", async (req, res) => {
         past_success_count: tx.past_success_count,
         status: tx.status || "FAILED",
         customer_name: tx.customer_name,
+        scenario_type: tx.scenario_type || "payment_degradation",
       });
 
       if (error) {
@@ -162,7 +164,7 @@ router.post("/seed", async (req, res) => {
 // POST /api/transactions/ingest — Ingest a single failed payment payload
 router.post("/ingest", async (req, res) => {
   try {
-    const { id, amount, decline_code, customer_name, retry_count, past_success_count } = req.body;
+    const { id, amount, decline_code, customer_name, retry_count, past_success_count, scenario_type } = req.body;
 
     if (!id || amount === undefined || !decline_code) {
       return res.status(400).json({
@@ -181,6 +183,7 @@ router.post("/ingest", async (req, res) => {
         past_success_count: past_success_count || 0,
         status: "FAILED",
         customer_name: customer_name || "Customer",
+        scenario_type: scenario_type || "payment_degradation",
       })
       .select()
       .single();
@@ -255,6 +258,54 @@ router.post("/:id/process", async (req, res) => {
   }
 });
 
+// GET /api/transactions/scenarios — Breakdown by scenario_type
+router.get("/scenarios", async (req, res) => {
+  try {
+    const { data: transactions, error } = await supabase
+      .from("transactions")
+      .select("id, amount, scenario_type, status")
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error(error.message);
+
+    const scenarioMap = {};
+    for (const tx of transactions) {
+      const type = tx.scenario_type || "payment_degradation";
+      if (!scenarioMap[type]) {
+        scenarioMap[type] = { type, count: 0, total_amount: 0, recovered_count: 0, recovered_amount: 0 };
+      }
+      scenarioMap[type].count++;
+      scenarioMap[type].total_amount += Number(tx.amount) || 0;
+      if (["LINK_SENT", "PAID"].includes(tx.status)) {
+        scenarioMap[type].recovered_count++;
+        scenarioMap[type].recovered_amount += Number(tx.amount) || 0;
+      }
+    }
+
+    const scenarios = Object.values(scenarioMap).sort((a, b) => b.count - a.count);
+    const totalCount = transactions.length;
+    const totalRecovered = scenarios.reduce((sum, s) => sum + s.recovered_count, 0);
+    const totalAmount = scenarios.reduce((sum, s) => sum + s.total_amount, 0);
+    const recoveredAmount = scenarios.reduce((sum, s) => sum + s.recovered_amount, 0);
+
+    res.json({
+      success: true,
+      data: {
+        scenarios,
+        summary: {
+          total_transactions: totalCount,
+          total_recovered: totalRecovered,
+          total_amount: totalAmount,
+          recovered_amount: recoveredAmount,
+          recovery_rate: totalCount > 0 ? Number(((totalRecovered / totalCount) * 100).toFixed(1)) : 0,
+        },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // GET /api/transactions — Fetch all transactions enriched with latest AI diagnosis
 router.get("/", async (req, res) => {
   try {
@@ -277,9 +328,14 @@ router.get("/", async (req, res) => {
           .maybeSingle();
 
         // Use audit log status as fallback if DB update was blocked by RLS
-        const resolvedStatus = auditLog?.ai_reasoning?.action_taken
-          ? mapActionToStatus(auditLog.ai_reasoning.action_taken)
-          : tx.status;
+        // But if DB status is terminal (RECOVERED, STOPPED), always use DB status
+        const dbStatus = tx.status;
+        const isTerminal = dbStatus === "RECOVERED" || dbStatus === "STOPPED";
+        const resolvedStatus = isTerminal
+          ? dbStatus
+          : (auditLog?.ai_reasoning?.action_taken
+            ? mapActionToStatus(auditLog.ai_reasoning.action_taken)
+            : dbStatus);
 
         return {
           ...tx,
@@ -323,11 +379,15 @@ router.get("/:id", async (req, res) => {
       .limit(1)
       .maybeSingle();
 
+    const dbStatus = tx.status;
+    const isTerminal = dbStatus === "RECOVERED" || dbStatus === "STOPPED";
     const enriched = {
       ...tx,
-      status: auditLog?.ai_reasoning?.action_taken
-        ? mapActionToStatus(auditLog.ai_reasoning.action_taken) || tx.status
-        : tx.status,
+      status: isTerminal
+        ? dbStatus
+        : (auditLog?.ai_reasoning?.action_taken
+          ? mapActionToStatus(auditLog.ai_reasoning.action_taken) || dbStatus
+          : dbStatus),
       gate_decision: auditLog?.gate_decision || null,
       recovery_probability: auditLog?.recovery_probability ?? null,
       ai_reasoning: auditLog?.ai_reasoning || null,

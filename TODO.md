@@ -1,103 +1,219 @@
-`# Retrek � Project Roadmap & Remaining TODOs
+# Retrek — Build Plan
 
-> **Track Focus:** Razorpay Buildathon (Track 3 � AI Revenue Recovery) � iQOO Track 1 (Mobile-First Experience)  
-> **Architecture:** 100% Node.js Express Backend (`/backend`) + ReactJS / TailwindCSS Frontend (`/frontend`) + Supabase PostgreSQL + Groq LLM + Razorpay SDK
-
----
-
-## ?? Table of Contents
-1. [Backend Fixes & Route Polish](#1-backend-fixes--route-polish)
-2. [Frontend Pages & Core Components](#2-frontend-pages--core-components)
-3. [Realtime Synchronization (Supabase WebSocket)](#3-realtime-synchronization-supabase-websocket)
-4. [Live Webhook & Gateway Integration](#4-live-webhook--gateway-integration)
-5. [End-to-End Testing & Verification Checklist](#5-end-to-end-testing--verification-checklist)
+> Track 3: AI Revenue Recovery · Razorpay Buildathon  
+> Source: https://razorpay.com/buildathon/
 
 ---
 
-## 1. Backend Fixes & Route Polish
+## What's Built
 
-- [x] **Fix Route Mounting Bug for `/api/dashboard/roi`**
-  - **File:** `backend/routes/audit.js` & `backend/server.js`
-  - **Issue:** `routes/audit.js` defines `router.get("/dashboard/roi")` while `server.js` mounts it at `app.use("/api/dashboard", ...)` resulting in `/api/dashboard/dashboard/roi`.
-  - **Task:** Update route definition in `routes/audit.js` to `router.get("/roi", ...)` so it properly matches `GET /api/dashboard/roi`.
-- [x] **Align Public vs. Protected Endpoints**
-  - **File:** `backend/server.js` & `backend/routes/ai.js`
-  - **Task:** Ensure `GET /api/health` remains public for uptime checks, while `GET /api/ai/llmTest` requires auth (or provide a public health ping version).
-- [x] **Batch Processing Endpoint**
-  - **File:** `backend/routes/transactions.js`
-  - **Task:** Add `POST /api/transactions/batch-process` to trigger AI diagnosis & policy evaluation for all unprocessed `FAILED` transactions at once.
+- ISO-8583 ontology (10 decline codes) + Groq LLM diagnosis
+- 3-gate policy engine (Auto-Execute / Human Approval / Stop Rule)
+- Razorpay payment link creation + webhook handler (HMAC + idempotency)
+- Auth (JWT 30-min), realtime Supabase, audit trail (full JSONB provenance)
+- Benchmark suite (4 pillars), 10 test scenarios
+- Dashboard, Transactions, ROI, Audit Trail, Benchmark, System Health, Ingest pages
+
+## What's Missing (7 hackathon directions, only 1 fully built)
 
 ---
 
-## 2. Frontend Pages & Core Components
+## Phase 1 — Database Schema
 
-- [x] **Wire `TransactionsView.jsx` into `TransactionsPage.jsx`**
-  - **File:** `frontend/src/pages/TransactionsPage.jsx`
-  - **Task:** Replace the static table in `TransactionsPage.jsx` with the rich `TransactionsView.jsx` component to enable searching, status filtering, transaction inspection modal, and direct AI recovery triggers.
-- [x] **Build ROI & Analytics View (`ROIMetrics.jsx`)**
-  - **File:** `frontend/src/pages/ROIMetrics.jsx`
-  - **Features:**
-    - Revenue recovery funnel: Total At Risk vs. Recovered vs. Stopped.
-    - Policy Gate Distribution chart: Gate 1 (Auto-Execute) vs. Gate 2 (Human Approval) vs. Gate 3 (Stop Rule).
-    - Recovery rate timeline and average latency metrics (Policy Engine <50ms vs. LLM inference).
-- [x] **Build Audit Trail & Provenance Ledger (`AuditTrail.jsx`)**
-  - **File:** `frontend/src/pages/AuditTrail.jsx`
-  - **Features:**
-    - Searchable table of all audit records from `GET /api/audit-logs/logs`.
-    - Filters by gate decision (`AUTO_EXECUTE`, `HUMAN_APPROVAL`, `STOP_RULE`) and decline code.
-    - Expandable modal showing full immutable JSONB `ai_reasoning` trace (model latency, ISO ontology mapping, prompt token telemetry).
-- [x] **Build Benchmark & Evaluation Runner View (`BenchmarkPage.jsx`)**
-  - **Route:** `/dashboard/benchmark`
-  - **Features:**
-    - "Run Live Benchmark" button that triggers `GET /api/benchmark/run`.
-    - Live display of the 4 Evaluation Pillars:
-      1. Adversarial Safety & Fraud Refusal Rate (100% Target).
-      2. Webhook Deduplication & Idempotency Rate (100% Target).
-      3. Policy Evaluation Latency (<50ms SLA).
-      4. Audit Provenance Coverage (100%).
-    - Batch scenario breakdown table showing each test case result.
-- [x] **Build System Health & Diagnostics View (`SystemHealth.jsx`)**
-  - **Route:** `/dashboard/system`
-  - **Features:**
-    - Live connection indicator for Supabase Database and Groq LLM inference (`qwen/qwen3.6-27b`).
-    - Latency ping graphs and API configuration validator.
-- [ ] **Build Manual Transaction Ingestion Modal / Form (`/dashboard/ingest`)**
-  - **Features:**
-    - Form to manually input failed transaction telemetry (Amount, Decline Code, Customer Name, Retry Count) to test real-time AI diagnosis.
+Add columns to `transactions` table:
+
+```sql
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS scenario_type TEXT DEFAULT 'payment_degradation';
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ptp_date DATE;
+```
+
+- [x] Run migration via Supabase SQL editor (manual — MCP permission denied)
 
 ---
 
-## 3. Realtime Synchronization (Supabase WebSocket)
+## Phase 2 — Expand Seed Data (10 → 20 scenarios)
 
-- [ ] **Configure Supabase Realtime Client in Frontend**
-  - **File:** `frontend/src/services/supabaseClient.js` (or context hook)
-  - **Task:** Initialize Supabase client in the frontend using anonymous public credentials.
-- [ ] **Subscribe to Database Changes**
-  - **Channels:**
-    - `public:transactions` (`INSERT`, `UPDATE`) ? Automatically updates Dashboard metrics, Transaction table, and Approvals queue without page refresh.
-    - `public:audit_logs` (`INSERT`) ? Streams new audit entries in real time to the Audit Trail.
+Replace `backend/data/batch_transactions.json` with 20 scenarios covering all 7 types.
+
+| # | scenario_type | decline_code | Amount | Customer | Expected Gate |
+|---|---|---|---|---|---|
+| 1 | payment_degradation | BANK_TIMEOUT_2FA | ₹2,499 | Rahul Sharma | AUTO_EXECUTE |
+| 2 | payment_degradation | BANK_TIMEOUT_GATEWAY | ₹15,000 | Priya Patel | HUMAN_APPROVAL |
+| 3 | payment_degradation | INSUFFICIENT_FUNDS | ₹4,500 | Aditya Verma | HUMAN_APPROVAL |
+| 4 | payment_degradation | SUSPECTED_FRAUD | ₹8,999 | Vikram Singh | STOP_RULE |
+| 5 | payment_degradation | BANK_TIMEOUT_2FA | ₹1,999 | Ananya Iyer | STOP_RULE |
+| 6 | payment_degradation | EXPIRED_CARD | ₹3,200 | Neha Gupta | AUTO_EXECUTE |
+| 7 | payment_degradation | CARD_LIMIT_EXCEEDED | ₹28,500 | Rohan Mehta | HUMAN_APPROVAL |
+| 8 | payment_degradation | PAYMENT_GATEWAY_DOWN | ₹499 | Siddharth Rao | AUTO_EXECUTE |
+| 9 | payment_degradation | ISSUER_DECLINED_GENERIC | ₹12,500 | Kavita Desai | HUMAN_APPROVAL |
+| 10 | payment_degradation | MICRO_TRANSACTION_FAILED | ₹9 | Arjun Nair | AUTO_EXECUTE |
+| 11 | checkout_dropoff | CHECKOUT_ABANDONED | ₹4,999 | Meera Joshi | AUTO_EXECUTE |
+| 12 | checkout_dropoff | CHECKOUT_ABANDONED | ₹12,000 | Karthik Menon | HUMAN_APPROVAL |
+| 13 | subscription_failure | INSUFFICIENT_FUNDS | ₹999 | Sanya Reddy | HUMAN_APPROVAL |
+| 14 | subscription_failure | EXPIRED_CARD | ₹2,499 | Tushar Bhatt | AUTO_EXECUTE |
+| 15 | b2b_receivables | ISSUER_DECLINED_GENERIC | ₹45,000 | InfoCorp Ltd | HUMAN_APPROVAL |
+| 16 | b2b_receivables | CARD_LIMIT_EXCEEDED | ₹28,000 | TechServe Pvt | HUMAN_APPROVAL |
+| 17 | mandate_retry | BANK_TIMEOUT_2FA | ₹2,500 | Deepak Nair | AUTO_EXECUTE |
+| 18 | mandate_retry | INSUFFICIENT_FUNDS | ₹1,800 | Pooja Sinha | HUMAN_APPROVAL |
+| 19 | voice_recovery | BANK_TIMEOUT_GATEWAY | ₹1,999 | Amit Verma | AUTO_EXECUTE |
+| 20 | ptp_commitment | INSUFFICIENT_FUNDS | ₹3,500 | Rekha Menon | HUMAN_APPROVAL |
+
+- [x] Write new `batch_transactions.json`
 
 ---
 
-## 4. Live Webhook & Gateway Integration
+## Phase 3 — Backend: Scenario-Aware AI Service
 
-- [ ] **ngrok / Webhook Tunneling Configuration**
-  - **Task:** Create an npm script (`npm run tunnel`) or helper documentation to expose `http://localhost:5000/api/webhooks/razorpay` to the internet.
-- [ ] **Razorpay Dashboard Webhook Registration**
-  - **Events to Subscribe:**
-    - `payment_link.paid` ? Triggers atomic DB lock and sets status to `RECOVERED`.
-    - `payment_link.failed` ? Re-triggers AI diagnosis and dunning retry sequencer.
-- [ ] **Webhook Signature Verification Validation**
-  - **File:** `backend/routes/webhooks.js`
-  - **Task:** Verify HMAC SHA256 signature against `RAZORPAY_WEBHOOK_SECRET`.
+Modify `backend/services/aiService.js`:
+
+- [x] Add 7 new decline codes to `ISO_ONTOLOGY_MAP`:
+  - `CHECKOUT_ABANDONED` → ISO Code 05, category CUSTOMER_ACTION_REQUIRED, P=0.75
+  - `SUBSCRIPTION_PAYMENT_FAILED` → ISO Code 51, category SOFT_FINANCIAL_DECLINE, P=0.65
+  - `INVOICE_OVERDUE` → ISO Code 05, category SOFT_FINANCIAL_DECLINE, P=0.70
+  - `MANDATE_ACTIVATION_FAILED` → ISO Code 91, category TECHNICAL_GLITCH, P=0.80
+  - `VOICE_RECOVERY_INITIATED` → ISO Code 96, category TECHNICAL_GLITCH, P=0.82
+  - `PTP_COMMITMENT_BREACH` → ISO Code 51, category SOFT_FINANCIAL_DECLINE, P=0.55
+
+- [x] Update LLM prompt to include `scenario_type` and tailor output:
+  - checkout_dropoff → emphasize urgency, one-click recovery
+  - subscription_failure → emphasize service continuity
+  - b2b_receivables → formal tone, invoice reference
+  - mandate_retry → technical NACH retry language
+  - voice_recovery → conversational IVR-style script
+  - ptp_commitment → reminder of prior commitment
+
+- [x] Add scenario-specific fallback Hinglish/English messages (used only when LLM fails)
+- [x] Fix catch block fallback to use scenario-aware messages (lines 292-293 still use old generic)
 
 ---
 
-## 5. End-to-End Testing & Verification Checklist
+## Phase 4 — Backend: Scenario-Aware Policy Engine
 
-- [ ] **Authentication Flow:** User signup ? login ? token persistence ? protected route access ? logout.
-- [ ] **Seeding & Pipeline Execution:** Seed 10 scenarios ? AI diagnoses root cause ? Policy engine enforces gates ? Razorpay links generated for Gate 1 ? Gate 2 items appear in Approvals Queue.
-- [ ] **Human-in-the-Loop Approval:** Swipe/Click Approve on high-ticket transaction ? Razorpay link created ? status changes to `LINK_SENT`.
-- [ ] **Adversarial Fraud Refusal:** Ingest `SUSPECTED_FRAUD` / `STOLEN_CARD` transaction ? verify 0 payment links created and immediate routing to `STOP_RULE`.
-- [ ] **Concurrency Webhook Idempotency:** Fire 10 simultaneous webhook events ? verify exactly 1 succeeds and 9 are rejected via PostgreSQL primary key lock.
-- [ ] **Benchmark Suite Execution:** Execute `node backend/scripts/runBenchmark.js` and verify all tests pass with full provenance.
+Modify `backend/services/policyEngine.js`:
+
+- [x] B2B receivables: raise auto-execute limit to ₹50,000 if past_success_count >= 10
+- [x] Subscription failures: reduce retry penalty to -0.10 per retry (vs -0.20)
+- [x] Mandate retries: allow up to 5 retries (vs standard 3)
+- [x] PTP commitments: if `ptp_date` is in the future, return STOP_RULE (not yet due)
+- [x] Return `scenario_type` in the gate decision object
+
+---
+
+## Phase 5 — Backend: Transaction Routes + Scenarios Endpoint
+
+Modify `backend/routes/transactions.js`:
+
+- [x] Accept `scenario_type` in `/ingest` endpoint
+- [x] Pass `scenario_type` through `processTransaction()`
+- [x] Add `GET /api/transactions/scenarios` — returns breakdown by scenario_type with counts and recovered amounts
+
+---
+
+## Phase 6 — Backend: Scheduler (Verify + Recover Stages)
+
+Create `backend/services/schedulerService.js`:
+
+- [x] `checkMandateRetries()` — find `scenario_type=mandate_retry` where `next_retry_at <= now`, re-run pipeline
+- [x] `checkPTPCommitments()` — find `scenario_type=ptp_commitment` where `ptp_date <= now`, re-run pipeline
+- [x] `verifyRecoveryAttempts()` — find `LINK_SENT` older than 24h, mark EXPIRED, re-diagnose
+- [x] Export `startScheduler()` function
+
+Modify `backend/server.js`:
+
+- [x] Import and call `startScheduler()` on boot (skip on Vercel)
+
+---
+
+## Phase 7 — Backend: Benchmark Expansion
+
+Modify `backend/routes/benchmark.js`:
+
+- [x] Add per-scenario-type metrics to benchmark report
+- [x] Add 5th evaluation pillar: "Scenario Coverage" — all 7 types must have >= 1 test case
+- [x] Add scenario-specific recovery rates
+
+---
+
+## Phase 8 — Frontend: ScenarioBadge Component
+
+Create `frontend/src/components/ScenarioBadge.jsx`:
+
+- [x] Reusable badge with color + label per scenario_type
+- [x] Colors: payment_degradation=blue, checkout_dropoff=orange, subscription_failure=purple, b2b_receivables=teal, mandate_retry=indigo, voice_recovery=pink, ptp_commitment=amber
+
+---
+
+## Phase 9 — Frontend: TransactionsView Scenario Column
+
+Modify `frontend/src/components/TransactionsView.jsx`:
+
+- [x] Add `scenario_type` column to data table
+- [x] Add scenario-type filter pills (alongside existing status filters)
+- [x] Show ScenarioBadge in each row
+
+---
+
+## Phase 10 — Frontend: DashboardHome Scenario Breakdown
+
+Modify `frontend/src/pages/DashboardHome.jsx`:
+
+- [x] Add 7 mini-cards showing count per scenario type
+- [x] Fetch from `/api/transactions/scenarios`
+
+---
+
+## Phase 11 — Frontend: ROIMetrics Scenario Distribution
+
+Modify `frontend/src/pages/ROIMetrics.jsx`:
+
+- [x] Add scenario-type recovery rate breakdown (bar chart or table)
+
+---
+
+## Phase 12 — Frontend: IngestPage Scenario Type
+
+Modify `frontend/src/pages/IngestPage.jsx`:
+
+- [x] Add `scenario_type` dropdown
+- [x] Auto-suggest decline_code when scenario_type is selected
+
+---
+
+## Phase 13 — Frontend: Recovery Tracker Page
+
+Create `frontend/src/pages/RecoveryTracker.jsx`:
+
+- [x] PTP commitments table (customer, amount, ptp_date, status)
+- [x] Mandate retry schedule (customer, amount, next_retry_at, retry_count)
+- [x] B2B receivables aging (current / 30-day / 60-day / 90-day buckets)
+
+Modify `frontend/src/pages/Dashboard.jsx`:
+
+- [x] Add "Recovery Tracker" sidebar item
+
+Modify `frontend/src/services/api.js`:
+
+- [x] Add `getScenarioStats()`, `getRecoveryTracker()`
+
+---
+
+## Phase 14 — Test Everything
+
+- [ ] Run SQL migration manually
+- [ ] Seed all 20 scenarios
+- [ ] Batch-process → verify all get AI diagnosis
+- [ ] Verify gate decisions match expected per scenario type
+- [ ] Verify audit trail has all 7 types
+- [ ] Run benchmark → verify all 5 pillars pass
+- [ ] Test Recovery Tracker page shows PTP/mandate/B2B data
+- [ ] Test fraud refusal works for all scenario types
+- [ ] Fix any issues
+
+---
+
+## Phase 15 — Pitch Prep
+
+- [ ] Ensure public GitHub repo is ready
+- [ ] Write 5-minute pitch script (Hook → Architecture → Demo → Safety → Benchmark)
+- [ ] Record pitch video

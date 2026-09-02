@@ -16,7 +16,7 @@ export function generateToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, username: user.username },
     JWT_SECRET,
-    { expiresIn: "7d" }
+    { expiresIn: "30m" }
   );
 }
 

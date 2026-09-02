@@ -17,6 +17,14 @@ export const authStorage = {
   clear: () => {
     localStorage.removeItem('retrek_token');
     localStorage.removeItem('retrek_user');
+    localStorage.removeItem('retrek_last_activity');
+  },
+  getLastActivity: () => {
+    const ts = localStorage.getItem('retrek_last_activity');
+    return ts ? parseInt(ts, 10) : null;
+  },
+  setLastActivity: () => {
+    localStorage.setItem('retrek_last_activity', String(Date.now()));
   }
 };
 
@@ -99,6 +107,13 @@ export const api = {
     return request('/transactions/seed', { method: 'POST' });
   },
 
+  async ingestTransaction(payload) {
+    return request('/transactions/ingest', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   async processTransaction(id) {
     return request(`/transactions/${id}/process`, { method: 'POST' });
   },
@@ -144,5 +159,10 @@ export const api = {
   // Health
   async getHealth() {
     return request('/health', { method: 'GET' });
+  },
+
+  // Scenarios
+  async getScenarioStats() {
+    return request('/transactions/scenarios', { method: 'GET' });
   },
 };

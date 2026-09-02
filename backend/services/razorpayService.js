@@ -5,48 +5,49 @@ const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 const RAZORPAY_BASE = "https://api.razorpay.com/v1";
 
 /**
- * Creates a Razorpay Payment Link via REST API.
+ * Creates a Razorpay Order via REST API (no payment link limit).
  * @param {Object} transaction - { id, amount, customer_name }
  * @param {string} message - Hinglish outreach message for the customer
- * @returns {{ payment_link_url: string, payment_link_id: string }}
+ * @returns {{ checkout_url: string, order_id: string, amount: number }}
  */
 export async function createPaymentLink(transaction, message) {
   const amountInPaise = Math.round(Number(transaction.amount) * 100);
-
-  const payload = {
-    amount: amountInPaise,
-    currency: "INR",
-    description: `Retrek Recovery — Retry payment of ₹${transaction.amount}`,
-    reference_id: `${transaction.id}_${Date.now()}`,
-    notes: {
-      transaction_id: transaction.id,
-      source: "retrek_auto_recovery",
-    },
-  };
-
   const credentials = Buffer.from(`${RAZORPAY_API_KEY}:${RAZORPAY_KEY_SECRET}`).toString("base64");
 
-  const response = await fetch(`${RAZORPAY_BASE}/payment_links`, {
+  // Step 1: Create Order
+  const orderRes = await fetch(`${RAZORPAY_BASE}/orders`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Basic ${credentials}`,
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      amount: amountInPaise,
+      currency: "INR",
+      receipt: `retrek_${transaction.id}`,
+      notes: {
+        transaction_id: transaction.id,
+        source: "retrek_auto_recovery",
+      },
+    }),
   });
 
-  const data = await response.json();
+  const orderData = await orderRes.json();
 
-  if (!response.ok) {
-    const errMsg = data.error?.description || JSON.stringify(data);
-    console.error(`❌ Razorpay API ${response.status}: ${errMsg}`);
-    throw new Error(`Razorpay API ${response.status}: ${errMsg}`);
+  if (!orderRes.ok) {
+    const errMsg = orderData.error?.description || JSON.stringify(orderData);
+    console.error(`❌ Razorpay Order API ${orderRes.status}: ${errMsg}`);
+    throw new Error(`Razorpay API ${orderRes.status}: ${errMsg}`);
   }
 
-  console.log(`✅ Payment link created for ${transaction.id}: ${data.short_url || data.id}`);
+  console.log(`✅ Order created for ${transaction.id}: ${orderData.id}`);
 
   return {
-    payment_link_url: data.short_url || `https://rzp.io/i/${data.id}`,
-    payment_link_id: data.id,
+    checkout_url: `/checkout?order_id=${orderData.id}&amount=${amountInPaise}&customer=${encodeURIComponent(transaction.customer_name || "Customer")}&transaction_id=${transaction.id}&message=${encodeURIComponent(message || "")}`,
+    payment_link_url: `/checkout?order_id=${orderData.id}&amount=${amountInPaise}&customer=${encodeURIComponent(transaction.customer_name || "Customer")}&transaction_id=${transaction.id}&message=${encodeURIComponent(message || "")}`,
+    payment_link_id: orderData.id,
+    order_id: orderData.id,
+    amount: amountInPaise,
+    key_id: RAZORPAY_API_KEY,
   };
 }

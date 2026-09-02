@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Retrek — Secure Payment</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .card { background: #fff; border-radius: 16px; padding: 40px; max-width: 420px; width: 90%; box-shadow: 0 4px 24px rgba(0,0,0,0.08); text-align: center; }
+    .logo { font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #94a3b8; margin-bottom: 24px; }
+    .merchant { font-size: 18px; font-weight: 600; color: #1e293b; margin-bottom: 4px; }
+    .desc { font-size: 14px; color: #64748b; margin-bottom: 20px; }
+    .amount { font-size: 36px; font-weight: 800; color: #0f766e; margin-bottom: 24px; }
+    .btn { background: #0f766e; color: #fff; border: none; border-radius: 10px; padding: 14px 32px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; transition: background 0.2s; }
+    .btn:hover { background: #0d6d66; }
+    .btn:disabled { background: #94a3b8; cursor: not-allowed; }
+    .status { margin-top: 16px; font-size: 14px; color: #64748b; }
+    .status.success { color: #16a34a; font-weight: 600; }
+    .status.error { color: #dc2626; font-weight: 600; }
+    .badge { display: inline-block; background: #f0fdf4; color: #166534; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Retrek</div>
+    <div class="subtitle">Secure Payment Recovery</div>
+    <div class="badge">Test Mode</div>
+    <div class="merchant" id="customer-name">Customer</div>
+    <div class="desc" id="description">Complete your pending payment</div>
+    <div class="amount" id="amount">₹0</div>
+    <button class="btn" id="pay-btn" onclick="openCheckout()">Pay Now</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    const serverParams = window.__SERVER_PARAMS__ || {};
+    const params = new URLSearchParams(window.location.search);
+    const orderId = serverParams.order_id || params.get('order_id');
+    const amount = serverParams.amount || params.get('amount');
+    const customerName = serverParams.customer || params.get('customer') || 'Customer';
+    const transactionId = serverParams.transaction_id || params.get('transaction_id');
+    const message = serverParams.message || params.get('message') || '';
+    const keyId = '__RAZORPAY_KEY_ID__';
+
+    document.getElementById('customer-name').textContent = customerName;
+    document.getElementById('amount').textContent = '₹' + (Number(amount) / 100).toLocaleString('en-IN');
+    document.getElementById('description').textContent = message || 'Complete your pending payment';
+
+    if (!orderId || !amount) {
+      document.getElementById('status').textContent = 'Invalid payment link. Missing order ID.';
+      document.getElementById('status').className = 'status error';
+      document.getElementById('pay-btn').disabled = true;
+    }
+
+    function openCheckout() {
+      const btn = document.getElementById('pay-btn');
+      const status = document.getElementById('status');
+      btn.disabled = true;
+      btn.textContent = 'Processing...';
+
+      const rzp = new Razorpay({
+        key: keyId,
+        amount: amount,
+        currency: 'INR',
+        name: 'Retrek Recovery',
+        description: message || 'Payment Recovery',
+        order_id: orderId,
+        handler: function (response) {
+          status.textContent = 'Payment successful! Payment ID: ' + response.razorpay_payment_id;
+          status.className = 'status success';
+          btn.textContent = 'Paid ✓';
+
+          // Fallback: also notify backend directly in case webhook fails
+          if (transactionId) {
+            fetch('/api/webhooks/razorpay/confirm', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                transaction_id: transactionId,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+              }),
+            }).then(r => r.json()).then(d => {
+              console.log('Backend confirmation:', d);
+              status.textContent = 'Payment successful & confirmed! Payment ID: ' + response.razorpay_payment_id;
+            }).catch(err => {
+              console.warn('Backend confirmation failed (webhook will handle):', err);
+            });
+          }
+        },
+        prefill: {
+          name: customerName,
+        },
+        theme: {
+          color: '#0f766e',
+        },
+        modal: {
+          ondismiss: function () {
+            status.textContent = 'Payment cancelled. You can try again.';
+            status.className = 'status error';
+            btn.disabled = false;
+            btn.textContent = 'Pay Now';
+          }
+        }
+      });
+
+      rzp.on('payment.failed', function (response) {
+        status.textContent = 'Payment failed: ' + response.error.description;
+        status.className = 'status error';
+        btn.disabled = false;
+        btn.textContent = 'Retry Payment';
+      });
+
+      rzp.open();
+    }
+
+    // Auto-open checkout on page load
+    if (orderId && amount) {
+      setTimeout(openCheckout, 500);
+    }
+  </script>
+</body>
+</html>

@@ -58,20 +58,20 @@ router.get("/health", async (req, res) => {
     services.llm.error = err.message;
   }
 
-  // 3. Test Razorpay API Connectivity
+  // 3. Test Razorpay API Connectivity (using Orders API, no link limit)
   const rzStartTime = Date.now();
   try {
     const creds = Buffer.from(`${process.env.TEST_API_KEY}:${process.env.RAZORPAY_KEY_SECRET}`).toString("base64");
-    const rzResp = await fetch("https://api.razorpay.com/v1/payment_links", {
+    const rzResp = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Basic ${creds}` },
-      body: JSON.stringify({ amount: 100, currency: "INR", description: "Retrek health check" }),
+      body: JSON.stringify({ amount: 100, currency: "INR", receipt: "health_check" }),
     });
     const rzData = await rzResp.json();
     services.razorpay = {
       status: rzResp.ok ? "connected" : "error",
       latencyMs: Date.now() - rzStartTime,
-      ...(rzResp.ok ? { short_url: rzData.short_url } : { error: rzData.error?.description || "Unknown error" }),
+      ...(rzResp.ok ? { order_id: rzData.id } : { error: rzData.error?.description || "Unknown error" }),
     };
   } catch (err) {
     services.razorpay = { status: "disconnected", latencyMs: Date.now() - rzStartTime, error: err.message };

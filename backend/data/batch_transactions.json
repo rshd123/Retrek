@@ -7,6 +7,7 @@
     "past_success_count": 5,
     "status": "FAILED",
     "customer_name": "Rahul Sharma",
+    "scenario_type": "payment_degradation",
     "scenario": "Low ticket, temporary 2FA bank timeout (Candidate for Gate 1 Auto-Execute)"
   },
   {
@@ -17,7 +18,8 @@
     "past_success_count": 8,
     "status": "FAILED",
     "customer_name": "Priya Patel",
-    "scenario": "High ticket (>= ₹10k), bank timeout (Candidate for Gate 2 Human Swipe Approval)"
+    "scenario_type": "payment_degradation",
+    "scenario": "High ticket (>= INR 10k), bank timeout (Candidate for Gate 2 Human Swipe Approval)"
   },
   {
     "id": "pay_Mx1029c",
@@ -27,6 +29,7 @@
     "past_success_count": 2,
     "status": "FAILED",
     "customer_name": "Aditya Verma",
+    "scenario_type": "payment_degradation",
     "scenario": "Insufficient funds, 1 previous retry (Candidate for Gate 2 Human Approval)"
   },
   {
@@ -37,6 +40,7 @@
     "past_success_count": 0,
     "status": "FAILED",
     "customer_name": "Vikram Singh",
+    "scenario_type": "payment_degradation",
     "scenario": "Fraud risk flag detected (Candidate for Gate 3 Stop Rule)"
   },
   {
@@ -47,6 +51,7 @@
     "past_success_count": 4,
     "status": "FAILED",
     "customer_name": "Ananya Iyer",
+    "scenario_type": "payment_degradation",
     "scenario": "Max retry limit reached (3 attempts) (Candidate for Gate 3 Stop Rule)"
   },
   {
@@ -57,6 +62,7 @@
     "past_success_count": 12,
     "status": "FAILED",
     "customer_name": "Neha Gupta",
+    "scenario_type": "payment_degradation",
     "scenario": "Expired card for loyal customer (Needs payment link outreach)"
   },
   {
@@ -67,6 +73,7 @@
     "past_success_count": 15,
     "status": "FAILED",
     "customer_name": "Rohan Mehta",
+    "scenario_type": "payment_degradation",
     "scenario": "Card limit exceeded on enterprise invoice (High-value Human Approval)"
   },
   {
@@ -77,6 +84,7 @@
     "past_success_count": 1,
     "status": "FAILED",
     "customer_name": "Siddharth Rao",
+    "scenario_type": "payment_degradation",
     "scenario": "SaaS micro-subscription payment gateway glitch (Auto-Execute candidate)"
   },
   {
@@ -87,6 +95,7 @@
     "past_success_count": 3,
     "status": "FAILED",
     "customer_name": "Kavita Desai",
+    "scenario_type": "payment_degradation",
     "scenario": "Generic issuer decline, medium confidence (Human Approval candidate)"
   },
   {
@@ -97,6 +106,117 @@
     "past_success_count": 0,
     "status": "FAILED",
     "customer_name": "Arjun Nair",
-    "scenario": "Micro-transaction $9 failure from SaaS real-world case study"
+    "scenario_type": "payment_degradation",
+    "scenario": "Micro-transaction INR 9 failure from SaaS real-world case study"
+  },
+  {
+    "id": "pay_Co1001a",
+    "amount": 4999.00,
+    "decline_code": "CHECKOUT_ABANDONED",
+    "retry_count": 0,
+    "past_success_count": 3,
+    "status": "FAILED",
+    "customer_name": "Meera Joshi",
+    "scenario_type": "checkout_dropoff",
+    "scenario": "Checkout drop-off: customer abandoned mid-payment on product page (Auto-Execute)"
+  },
+  {
+    "id": "pay_Co1002b",
+    "amount": 12000.00,
+    "decline_code": "CHECKOUT_ABANDONED",
+    "retry_count": 0,
+    "past_success_count": 1,
+    "status": "FAILED",
+    "customer_name": "Karthik Menon",
+    "scenario_type": "checkout_dropoff",
+    "scenario": "Checkout drop-off: high-value cart abandoned, first-time customer (Human Approval)"
+  },
+  {
+    "id": "pay_Su2001a",
+    "amount": 999.00,
+    "decline_code": "INSUFFICIENT_FUNDS",
+    "retry_count": 1,
+    "past_success_count": 6,
+    "status": "FAILED",
+    "customer_name": "Sanya Reddy",
+    "scenario_type": "subscription_failure",
+    "scenario": "Monthly SaaS subscription renewal failed due to insufficient funds (Human Approval)"
+  },
+  {
+    "id": "pay_Su2002b",
+    "amount": 2499.00,
+    "decline_code": "EXPIRED_CARD",
+    "retry_count": 0,
+    "past_success_count": 12,
+    "status": "FAILED",
+    "customer_name": "Tushar Bhatt",
+    "scenario_type": "subscription_failure",
+    "scenario": "Annual subscription failed: card expired for 12-month loyal subscriber (Auto-Execute)"
+  },
+  {
+    "id": "pay_B2B3001a",
+    "amount": 45000.00,
+    "decline_code": "ISSUER_DECLINED_GENERIC",
+    "retry_count": 0,
+    "past_success_count": 18,
+    "status": "FAILED",
+    "customer_name": "InfoCorp Ltd",
+    "scenario_type": "b2b_receivables",
+    "scenario": "B2B receivables: overdue enterprise invoice, trusted vendor with 18 past payments (Human Approval)"
+  },
+  {
+    "id": "pay_B2B3002b",
+    "amount": 28000.00,
+    "decline_code": "CARD_LIMIT_EXCEEDED",
+    "retry_count": 1,
+    "past_success_count": 8,
+    "status": "FAILED",
+    "customer_name": "TechServe Pvt Ltd",
+    "scenario_type": "b2b_receivables",
+    "scenario": "B2B receivables: corporate card limit hit on quarterly settlement (Human Approval)"
+  },
+  {
+    "id": "pay_Md4001a",
+    "amount": 2500.00,
+    "decline_code": "BANK_TIMEOUT_2FA",
+    "retry_count": 0,
+    "past_success_count": 4,
+    "status": "FAILED",
+    "customer_name": "Deepak Nair",
+    "scenario_type": "mandate_retry",
+    "scenario": "NACH e-mandate failed due to 2FA timeout, first attempt (Auto-Execute, schedule next retry)"
+  },
+  {
+    "id": "pay_Md4002b",
+    "amount": 1800.00,
+    "decline_code": "INSUFFICIENT_FUNDS",
+    "retry_count": 2,
+    "past_success_count": 7,
+    "status": "FAILED",
+    "customer_name": "Pooja Sinha",
+    "scenario_type": "mandate_retry",
+    "scenario": "NACH e-mandate failed: insufficient funds on 3rd attempt, loyal customer (Human Approval, schedule next retry)"
+  },
+  {
+    "id": "pay_Vo5001a",
+    "amount": 1999.00,
+    "decline_code": "BANK_TIMEOUT_GATEWAY",
+    "retry_count": 0,
+    "past_success_count": 2,
+    "status": "FAILED",
+    "customer_name": "Amit Verma",
+    "scenario_type": "voice_recovery",
+    "scenario": "Voice recovery: customer called for IVR payment, gateway timed out (Auto-Execute, generate voice script)"
+  },
+  {
+    "id": "pay_Pt6001a",
+    "amount": 3500.00,
+    "decline_code": "INSUFFICIENT_FUNDS",
+    "retry_count": 1,
+    "past_success_count": 5,
+    "status": "FAILED",
+    "customer_name": "Rekha Menon",
+    "scenario_type": "ptp_commitment",
+    "scenario": "Promise-to-pay: customer committed to pay on Friday, today is check day (Human Approval, verify ptp_date)"
   }
 ]

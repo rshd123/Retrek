@@ -15,6 +15,11 @@ const DATA_DIR = path.resolve(__dirname, "../data");
 const BATCH_FILE = path.join(DATA_DIR, "batch_transactions.json");
 const RESULTS_FILE = path.join(DATA_DIR, "benchmark_results.json");
 
+const ALL_SCENARIO_TYPES = [
+  "payment_degradation", "checkout_dropoff", "subscription_failure",
+  "b2b_receivables", "mandate_retry", "voice_recovery", "ptp_commitment"
+];
+
 /**
  * Executes the complete automated benchmark & evaluation suite.
  * Evaluates:
@@ -22,7 +27,8 @@ const RESULTS_FILE = path.join(DATA_DIR, "benchmark_results.json");
  * 2. Webhook Idempotency under concurrency
  * 3. Deterministic Policy Latency & LLM Inference Latency
  * 4. Audit Provenance Coverage
- * 5. Measured Batch Revenue Yield
+ * 5. Scenario Coverage — all 7 types must have >= 1 test case
+ * 6. Measured Batch Revenue Yield
  */
 export async function executeBenchmarkSuite() {
   const benchmarkStartTime = Date.now();
@@ -46,6 +52,12 @@ export async function executeBenchmarkSuite() {
   let adversarialSafetyPassed = true;
   let provenanceCoveragePassed = true;
 
+  // Per-scenario tracking
+  const scenarioMetrics = {};
+  for (const type of ALL_SCENARIO_TYPES) {
+    scenarioMetrics[type] = { count: 0, recovered: 0, revenue_at_risk: 0, recovered_amount: 0, gate_breakdown: {} };
+  }
+
   // ----------------------------------------------------
   // PILLAR 1 & 4: Process 10 Test Scenarios
   // ----------------------------------------------------
@@ -54,6 +66,7 @@ export async function executeBenchmarkSuite() {
     totalRevenueAtRisk += amount;
 
     // Step 1: Upsert into DB
+    const scenarioType = tx.scenario_type || "payment_degradation";
     const { error: upsertErr } = await supabase.from("transactions").upsert({
       id: tx.id,
       amount: tx.amount,
@@ -62,6 +75,7 @@ export async function executeBenchmarkSuite() {
       past_success_count: tx.past_success_count || 0,
       status: tx.status || "FAILED",
       customer_name: tx.customer_name || "Customer",
+      scenario_type: scenarioType,
     });
 
     if (upsertErr) {
@@ -110,6 +124,19 @@ export async function executeBenchmarkSuite() {
     // Update status in DB
     await supabase.from("transactions").update({ status: newStatus }).eq("id", tx.id);
 
+    // Track per-scenario metrics
+    if (!scenarioMetrics[scenarioType]) {
+      scenarioMetrics[scenarioType] = { count: 0, recovered: 0, revenue_at_risk: 0, recovered_amount: 0, gate_breakdown: {} };
+    }
+    scenarioMetrics[scenarioType].count++;
+    scenarioMetrics[scenarioType].revenue_at_risk += amount;
+    if (["LINK_SENT", "PENDING_APPROVAL", "AUTO_EXECUTE_LINK_SENT"].includes(newStatus)) {
+      scenarioMetrics[scenarioType].recovered++;
+      scenarioMetrics[scenarioType].recovered_amount += amount;
+    }
+    scenarioMetrics[scenarioType].gate_breakdown[policy.gate_decision] =
+      (scenarioMetrics[scenarioType].gate_breakdown[policy.gate_decision] || 0) + 1;
+
     // Step 5: Immutable Audit Log Entry
     const { error: auditErr } = await supabase.from("audit_logs").insert({
       transaction_id: tx.id,
@@ -142,6 +169,7 @@ export async function executeBenchmarkSuite() {
     scenarioResults.push({
       transaction_id: tx.id,
       customer_name: tx.customer_name,
+      scenario_type: scenarioType,
       amount,
       decline_code: tx.decline_code,
       iso_code: diagnosis.iso_code,
@@ -208,6 +236,31 @@ export async function executeBenchmarkSuite() {
       ? ((recoverableRevenue / totalRevenueAtRisk) * 100).toFixed(1)
       : "0.0";
 
+  // ----------------------------------------------------
+  // PILLAR 5: Scenario Coverage — all 7 types must have >= 1 test case
+  // ----------------------------------------------------
+  const coveredScenarios = Object.keys(scenarioMetrics).filter(
+    (type) => scenarioMetrics[type].count > 0
+  );
+  const missingScenarios = ALL_SCENARIO_TYPES.filter(
+    (type) => !scenarioMetrics[type] || scenarioMetrics[type].count === 0
+  );
+  const scenarioCoveragePassed = missingScenarios.length === 0;
+
+  // Compute per-scenario recovery rates
+  const scenarioCoverage = {};
+  for (const type of ALL_SCENARIO_TYPES) {
+    const m = scenarioMetrics[type];
+    scenarioCoverage[type] = {
+      count: m.count,
+      revenue_at_risk: m.revenue_at_risk,
+      recovered_count: m.recovered,
+      recovered_amount: m.recovered_amount,
+      recovery_rate: m.count > 0 ? `${((m.recovered / m.count) * 100).toFixed(1)}%` : "N/A",
+      gate_breakdown: m.gate_breakdown,
+    };
+  }
+
   const totalBenchmarkDurationMs = Date.now() - benchmarkStartTime;
 
   const benchmarkReport = {
@@ -243,7 +296,13 @@ export async function executeBenchmarkSuite() {
         status: provenanceCoveragePassed ? "PASS" : "WARN",
         description: "100% of decisions recorded with ISO-8583 ontology and JSONB reasoning trace",
       },
+      pillar_5_scenario_coverage: {
+        score: scenarioCoveragePassed ? "100.0%" : `${coveredScenarios.length}/7`,
+        status: scenarioCoveragePassed ? "PASS" : "FAIL",
+        description: `All 7 scenario types covered. ${missingScenarios.length > 0 ? `Missing: ${missingScenarios.join(", ")}` : "Full coverage."}`,
+      },
     },
+    scenario_coverage: scenarioCoverage,
     timing: {
       average_policy_latency_ms: avgPolicyLatencyMs,
       average_ai_latency_ms: avgAiLatencyMs,

@@ -1,5 +1,15 @@
 import { useState, useMemo } from 'react';
 import { api } from '../services/api';
+import ScenarioBadge from './ScenarioBadge';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const BACKEND_BASE = API_BASE.replace(/\/api\/?$/, '');
+
+function resolveCheckoutUrl(url) {
+  if (!url) return url;
+  if (url.startsWith('http')) return url;
+  return `${BACKEND_BASE}${url}`;
+}
 
 export default function TransactionsView({
   transactions = [],
@@ -10,6 +20,7 @@ export default function TransactionsView({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [scenarioFilter, setScenarioFilter] = useState('ALL');
   const [selectedTx, setSelectedTx] = useState(null);
   const [processingId, setProcessingId] = useState(null);
   const [batchProcessing, setBatchProcessing] = useState(false);
@@ -28,6 +39,13 @@ export default function TransactionsView({
     const failed = transactions.filter((tx) => tx.status === 'FAILED');
     const stopped = transactions.filter((tx) => tx.status === 'STOPPED' || tx.status === 'REFUSED');
 
+    // Scenario counts
+    const scenarioCounts = {};
+    for (const tx of transactions) {
+      const type = tx.scenario_type || 'payment_degradation';
+      scenarioCounts[type] = (scenarioCounts[type] || 0) + 1;
+    }
+
     return {
       totalCount,
       totalAmount,
@@ -37,16 +55,21 @@ export default function TransactionsView({
       linkSentCount: linkSent.length,
       failedCount: failed.length,
       stoppedCount: stopped.length,
+      scenarioCounts,
     };
   }, [transactions]);
 
-  // Filter transactions based on search query and status filter
+  // Filter transactions based on search query, status filter, and scenario filter
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
       const matchesStatus =
         statusFilter === 'ALL' ||
         (statusFilter === 'STOPPED' && (tx.status === 'STOPPED' || tx.status === 'REFUSED')) ||
         tx.status === statusFilter;
+
+      const matchesScenario =
+        scenarioFilter === 'ALL' ||
+        (tx.scenario_type || 'payment_degradation') === scenarioFilter;
 
       const query = searchQuery.trim().toLowerCase();
       const matchesSearch =
@@ -55,11 +78,12 @@ export default function TransactionsView({
         (tx.customer_name && tx.customer_name.toLowerCase().includes(query)) ||
         (tx.decline_code && tx.decline_code.toLowerCase().includes(query)) ||
         (tx.status && tx.status.toLowerCase().includes(query)) ||
-        (tx.gate_decision && tx.gate_decision.toLowerCase().includes(query));
+        (tx.gate_decision && tx.gate_decision.toLowerCase().includes(query)) ||
+        (tx.scenario_type && tx.scenario_type.toLowerCase().includes(query));
 
-      return matchesStatus && matchesSearch;
+      return matchesStatus && matchesScenario && matchesSearch;
     });
-  }, [transactions, statusFilter, searchQuery]);
+  }, [transactions, statusFilter, scenarioFilter, searchQuery]);
 
   const copyToClipboard = (text, id) => {
     if (!text) return;
@@ -252,20 +276,38 @@ export default function TransactionsView({
           )}
         </div>
 
-        {/* Status Filter Pills */}
+        {/* Filter Pills — Status + Scenario */}
         <div className="tx-status-filters">
           {[
             { key: 'ALL', label: 'All', count: stats.totalCount },
-            { key: 'FAILED', label: 'Failed (Unprocessed)', count: stats.failedCount },
+            { key: 'FAILED', label: 'Failed', count: stats.failedCount },
             { key: 'LINK_SENT', label: 'Link Sent', count: stats.linkSentCount },
-            { key: 'PENDING_APPROVAL', label: 'Pending Approval', count: stats.pendingCount },
+            { key: 'PENDING_APPROVAL', label: 'Pending', count: stats.pendingCount },
             { key: 'RECOVERED', label: 'Recovered', count: stats.recoveredCount },
-            { key: 'STOPPED', label: 'Stopped / Fraud', count: stats.stoppedCount },
+            { key: 'STOPPED', label: 'Stopped', count: stats.stoppedCount },
           ].map((item) => (
             <button
               key={item.key}
               className={`filter-pill ${statusFilter === item.key ? 'filter-pill-active' : ''}`}
               onClick={() => setStatusFilter(item.key)}
+            >
+              {item.label} <span className="pill-count">{item.count}</span>
+            </button>
+          ))}
+          <span className="filter-divider" />
+          {[
+            { key: 'payment_degradation', label: 'Payment', count: stats.scenarioCounts.payment_degradation || 0 },
+            { key: 'checkout_dropoff', label: 'Checkout', count: stats.scenarioCounts.checkout_dropoff || 0 },
+            { key: 'subscription_failure', label: 'Subscription', count: stats.scenarioCounts.subscription_failure || 0 },
+            { key: 'b2b_receivables', label: 'B2B', count: stats.scenarioCounts.b2b_receivables || 0 },
+            { key: 'mandate_retry', label: 'Mandate', count: stats.scenarioCounts.mandate_retry || 0 },
+            { key: 'voice_recovery', label: 'Voice', count: stats.scenarioCounts.voice_recovery || 0 },
+            { key: 'ptp_commitment', label: 'PTP', count: stats.scenarioCounts.ptp_commitment || 0 },
+          ].map((item) => (
+            <button
+              key={item.key}
+              className={`filter-pill filter-pill-scenario ${scenarioFilter === item.key ? 'filter-pill-active' : ''}`}
+              onClick={() => setScenarioFilter(item.key)}
             >
               {item.label} <span className="pill-count">{item.count}</span>
             </button>
@@ -279,15 +321,15 @@ export default function TransactionsView({
           {transactions.length === 0 ? (
             <div>
               <p style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>No transactions recorded yet.</p>
-              <p style={{ marginBottom: '16px' }}>Click below to seed 10 synthetic real-world merchant failure scenarios and test the AI diagnosis engine.</p>
+              <p style={{ marginBottom: '16px' }}>Click below to seed 20 synthetic scenarios covering all 7 recovery types and test the AI diagnosis engine.</p>
               <button className="btn btn-primary" onClick={onSeed} disabled={loading}>
-                {loading ? 'Processing...' : 'Seed 10 Test Cases'}
-              </button>
-            </div>
-          ) : (
-            <div>
-              <p>No transactions match your current search and filter criteria.</p>
-              <button className="btn btn-outline" style={{ marginTop: '12px' }} onClick={() => { setSearchQuery(''); setStatusFilter('ALL'); }}>
+            {loading ? 'Processing...' : 'Seed 20 Test Cases'}
+          </button>
+        </div>
+      ) : (
+        <div>
+          <p>No transactions match your current search and filter criteria.</p>
+              <button className="btn btn-outline" style={{ marginTop: '12px' }} onClick={() => { setSearchQuery(''); setStatusFilter('ALL'); setScenarioFilter('ALL'); }}>
                 Reset Filters
               </button>
             </div>
@@ -353,9 +395,9 @@ export default function TransactionsView({
                       <span className={`badge-decline badge-${(tx.decline_code || 'generic').toLowerCase()}`}>
                         {formatDeclineCode(tx.decline_code)}
                       </span>
-                      {tx.iso_code && (
-                        <span className="decline-iso">{tx.iso_code}</span>
-                      )}
+                      <div style={{ marginTop: '4px' }}>
+                        <ScenarioBadge scenarioType={tx.scenario_type} compact />
+                      </div>
                     </td>
                     <td data-label="AI Decision Gate">
                       {gate ? (
@@ -541,28 +583,28 @@ export default function TransactionsView({
                 </div>
               )}
 
-              {/* 4. Razorpay Test Recovery Payment Link */}
+              {/* 4. Razorpay Recovery Payment Link */}
               {selectedTx.payment_link_url && (
                 <div className="modal-section-box highlight-box" style={{ marginTop: '12px' }}>
                   <span className="modal-label text-green" style={{ fontWeight: '700' }}>
-                    Razorpay Bounded Payment Link (Idempotent)
+                    Razorpay Checkout Link
                   </span>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
                     <input
                       type="text"
                       readOnly
-                      value={selectedTx.payment_link_url}
+                      value={resolveCheckoutUrl(selectedTx.payment_link_url)}
                       className="tx-search-input"
                       style={{ fontSize: '13px', background: '#ffffff', fontFamily: 'monospace' }}
                     />
                     <button
                       className="btn btn-sm btn-outline"
-                      onClick={() => copyToClipboard(selectedTx.payment_link_url, 'modal_link')}
+                      onClick={() => copyToClipboard(resolveCheckoutUrl(selectedTx.payment_link_url), 'modal_link')}
                     >
                       {copiedId === 'modal_link' ? '✓ Copied' : 'Copy Link'}
                     </button>
                     <a
-                      href={selectedTx.payment_link_url}
+                      href={resolveCheckoutUrl(selectedTx.payment_link_url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn-sm btn-primary"

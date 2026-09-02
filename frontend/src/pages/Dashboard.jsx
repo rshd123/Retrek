@@ -6,6 +6,8 @@ import TransactionsPage from './TransactionsPage';
 import AuditTrail from './AuditTrail';
 import BenchmarkPage from './BenchmarkPage';
 import SystemHealth from './SystemHealth';
+import IngestPage from './IngestPage';
+import RecoveryTracker from './RecoveryTracker';
 
 const SIDEBAR_ITEMS = [
   { key: 'home', label: 'Dashboard', path: '/dashboard', icon: (
@@ -45,6 +47,17 @@ const SIDEBAR_ITEMS = [
       <line x1="6" y1="18" x2="6.01" y2="18" />
     </svg>
   )},
+  { key: 'ingest', label: 'Ingest', path: '/dashboard/ingest', icon: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )},
+  { key: 'tracker', label: 'Recovery Tracker', path: '/dashboard/tracker', icon: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  )},
 ];
 
 function getActiveKey(path) {
@@ -56,7 +69,6 @@ function getActiveKey(path) {
 
 export default function Dashboard({ navigate, currentPath }) {
   const { user, logout } = useAuth();
-  const [seedVersion] = useState(0);
   const [toast, setToast] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -76,19 +88,23 @@ export default function Dashboard({ navigate, currentPath }) {
   const renderContent = () => {
     switch (activeKey) {
       case 'home':
-        return <DashboardHome navigate={navigate} seedVersion={seedVersion} />;
+        return <DashboardHome navigate={navigate} />;
       case 'roi':
         return <ROIMetrics />;
       case 'transactions':
-        return <TransactionsPage seedVersion={seedVersion} />;
+        return <TransactionsPage />;
       case 'audit':
         return <AuditTrail />;
       case 'benchmark':
         return <BenchmarkPage />;
       case 'system':
         return <SystemHealth />;
+      case 'ingest':
+        return <IngestPage />;
+      case 'tracker':
+        return <RecoveryTracker />;
       default:
-        return <DashboardHome navigate={navigate} seedVersion={seedVersion} />;
+        return <DashboardHome navigate={navigate} />;
     }
   };
 

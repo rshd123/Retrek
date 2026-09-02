@@ -1,20 +1,26 @@
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { useRefetchKey } from '../context/RealtimeContext';
+import ScenarioBadge from '../components/ScenarioBadge';
 
 export default function ROIMetrics() {
   const [roi, setRoi] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [scenarioData, setScenarioData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const refetchKey = useRefetchKey();
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [roiRes, txRes] = await Promise.all([
+        const [roiRes, txRes, scRes] = await Promise.allSettled([
           api.getROI(),
           api.getTransactions(),
+          api.getScenarioStats(),
         ]);
-        setRoi(roiRes.data || roiRes);
-        setTransactions(txRes.data || []);
+        if (roiRes.status === 'fulfilled') setRoi(roiRes.value.data || roiRes.value);
+        if (txRes.status === 'fulfilled') setTransactions(txRes.value.data || []);
+        if (scRes.status === 'fulfilled') setScenarioData(scRes.value.data || scRes.value);
       } catch (err) {
         console.error('ROI load error:', err);
       } finally {
@@ -22,7 +28,7 @@ export default function ROIMetrics() {
       }
     };
     load();
-  }, []);
+  }, [refetchKey]);
 
   if (loading) {
     return (
@@ -235,6 +241,60 @@ export default function ROIMetrics() {
           ))}
         </div>
       </div>
+
+      {/* Scenario Recovery Distribution */}
+      {scenarioData?.scenarios?.length > 0 && (
+        <div style={{ marginBottom: '28px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '14px', color: 'var(--text)' }}>
+            Recovery by Scenario Type
+          </h3>
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid rgba(23, 79, 67, 0.1)',
+            borderRadius: '12px',
+            overflow: 'hidden',
+          }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+              <thead>
+                <tr style={{ background: '#f8f7f1' }}>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Scenario Type</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Count</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Recovered</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Amount</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b', width: '30%' }}>Recovery Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scenarioData.scenarios.map((s) => {
+                  const rate = s.count > 0 ? ((s.recovered_count / s.count) * 100) : 0;
+                  return (
+                    <tr key={s.type} style={{ borderBottom: '1px solid rgba(23, 79, 67, 0.06)' }}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <ScenarioBadge scenarioType={s.type} />
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700' }}>{s.count}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', color: '#38a169', fontWeight: '700' }}>{s.recovered_count}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '600' }}>
+                        ₹{Number(s.recovered_amount).toLocaleString('en-IN')}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ flex: 1, height: '6px', background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${rate}%`, background: rate >= 50 ? '#38a169' : rate > 0 ? '#d69e2e' : '#e2e8f0', borderRadius: '3px' }} />
+                          </div>
+                          <span style={{ fontSize: '12px', fontWeight: '700', color: '#475569', minWidth: '40px' }}>
+                            {rate.toFixed(0)}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Decline Code Breakdown */}
       {declineCodes.length > 0 && (

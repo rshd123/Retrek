@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
+import { useRefetchKey } from '../context/RealtimeContext';
 
 export default function AuditTrail() {
   const [logs, setLogs] = useState([]);
@@ -7,6 +8,7 @@ export default function AuditTrail() {
   const [searchQuery, setSearchQuery] = useState('');
   const [gateFilter, setGateFilter] = useState('ALL');
   const [selectedLog, setSelectedLog] = useState(null);
+  const refetchKey = useRefetchKey();
 
   useEffect(() => {
     const load = async () => {
@@ -20,7 +22,7 @@ export default function AuditTrail() {
       }
     };
     load();
-  }, []);
+  }, [refetchKey]);
 
   const filtered = useMemo(() => {
     return logs.filter((log) => {

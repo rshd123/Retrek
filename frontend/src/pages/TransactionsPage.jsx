@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
+import { useRefetchKey } from '../context/RealtimeContext';
 import TransactionsView from '../components/TransactionsView';
 
-export default function TransactionsPage({ seedVersion }) {
+export default function TransactionsPage() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
+  const refetchKey = useRefetchKey();
 
   const loadTransactions = useCallback(async () => {
     setLoading(true);
@@ -21,7 +23,15 @@ export default function TransactionsPage({ seedVersion }) {
 
   useEffect(() => {
     loadTransactions();
-  }, [seedVersion, loadTransactions]);
+  }, [loadTransactions, refetchKey]);
+
+  // Polling fallback: refresh every 5s in case Supabase Realtime misses updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadTransactions();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [loadTransactions]);
 
   const handleSeed = async () => {
     setLoading(true);

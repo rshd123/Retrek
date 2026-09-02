@@ -75,6 +75,84 @@ export const ISO_ONTOLOGY_MAP = {
     category: "FRAUD_OR_SECURITY_RISK",
     base_probability: 0.00,
     description: "Stolen Card / Pick Up flag from network"
+  },
+  CHECKOUT_ABANDONED: {
+    iso_code: "ISO-8583 Code 05",
+    category: "CUSTOMER_ACTION_REQUIRED",
+    base_probability: 0.75,
+    description: "Checkout abandoned before payment completion"
+  },
+  SUBSCRIPTION_PAYMENT_FAILED: {
+    iso_code: "ISO-8583 Code 51",
+    category: "SOFT_FINANCIAL_DECLINE",
+    base_probability: 0.65,
+    description: "Recurring subscription payment failed"
+  },
+  INVOICE_OVERDUE: {
+    iso_code: "ISO-8583 Code 05",
+    category: "SOFT_FINANCIAL_DECLINE",
+    base_probability: 0.70,
+    description: "B2B invoice payment overdue"
+  },
+  MANDATE_ACTIVATION_FAILED: {
+    iso_code: "ISO-8583 Code 91",
+    category: "TECHNICAL_GLITCH",
+    base_probability: 0.80,
+    description: "NACH e-mandate activation or debit failed"
+  },
+  VOICE_RECOVERY_INITIATED: {
+    iso_code: "ISO-8583 Code 96",
+    category: "TECHNICAL_GLITCH",
+    base_probability: 0.82,
+    description: "Voice channel payment recovery in progress"
+  },
+  PTP_COMMITMENT_BREACH: {
+    iso_code: "ISO-8583 Code 51",
+    category: "SOFT_FINANCIAL_DECLINE",
+    base_probability: 0.55,
+    description: "Customer promise-to-pay commitment not fulfilled"
+  }
+};
+
+// Scenario-specific context for LLM prompt
+const SCENARIO_CONTEXT = {
+  checkout_dropoff: "This is a CHECKOUT DROP-OFF case: the customer abandoned their cart mid-payment. Emphasize urgency and one-click recovery. The customer was interested but dropped off — make re-engagement easy.",
+  subscription_failure: "This is a SUBSCRIPTION FAILURE case: a recurring payment failed and the customer's service may be interrupted. Emphasize service continuity and minimal disruption.",
+  b2b_receivables: "This is a B2B RECEIVABLES case: an enterprise invoice is overdue. Use FORMAL English tone. Reference invoice settlement and business relationship. No casual Hinglish.",
+  mandate_retry: "This is a MANDATE RETRY case: a NACH e-mandate or recurring auto-debit failed at the bank level. Use technical language about mandate reactivation and scheduled retry.",
+  voice_recovery: "This is a VOICE RECOVERY case: the customer is on an IVR or voice call. Generate a conversational, speakable script suitable for read-back over phone. Keep sentences short and natural.",
+  ptp_commitment: "This is a PROMISE-TO-PAY case: the customer previously committed to paying on a specific date. Reference their prior commitment politely and provide the payment link."
+};
+
+// Scenario-specific fallback messages
+const SCENARIO_FALLBACKS = {
+  checkout_dropoff: {
+    hinglish: (name, amt) => `Hi ${name}, aapka checkout adhura reh gaya hai (₹${amt}). Niche diye link se ek click mein payment complete karein!`,
+    english: (name, amt) => `Hello ${name}, your checkout for ₹${amt} is incomplete. Complete your purchase now with the secure link below.`
+  },
+  subscription_failure: {
+    hinglish: (name, amt) => `Hi ${name}, aapka ₹${amt} ka subscription payment fail ho gaya hai. Link se retry karein taaki aapki service na ruke.`,
+    english: (name, amt) => `Hello ${name}, your subscription payment of ₹${amt} failed. Please retry now to avoid service interruption.`
+  },
+  b2b_receivables: {
+    hinglish: (name, amt) => `Dear ${name}, this is a reminder for your overdue invoice settlement of ₹${amt}. Please process the payment at your earliest convenience using the link below.`,
+    english: (name, amt) => `Dear ${name}, your invoice of ₹${amt} is overdue. Please settle the outstanding amount using the payment link below.`
+  },
+  mandate_retry: {
+    hinglish: (name, amt) => `Hi ${name}, aapka e-mandate payment (₹${amt}) bank side se fail hua hai. Niche diye link se retry karein ya next retry ka wait karein.`,
+    english: (name, amt) => `Hello ${name}, your e-mandate payment of ₹${amt} failed at the bank. Please retry using the link or wait for the next scheduled attempt.`
+  },
+  voice_recovery: {
+    hinglish: (name, amt) => `Namaste ${name}, hum Retrek se bol rahe hain. Aapka ₹${amt} ka payment nahi ho paya. Kya aap abhi link se payment kar sakte hain?`,
+    english: (name, amt) => `Hello ${name}, this is Retrek calling about your failed payment of ₹${amt}. Would you like to complete the payment now using the link we'll send you?`
+  },
+  ptp_commitment: {
+    hinglish: (name, amt) => `Hi ${name}, aapne kal payment karne ka promise kiya tha (₹${amt}). Aaj ka din aa gaya hai — link se complete karein.`,
+    english: (name, amt) => `Hello ${name}, as per your promise-to-pay commitment, your payment of ₹${amt} is now due. Please complete it using the link below.`
+  },
+  payment_degradation: {
+    hinglish: (name, amt) => `Hi ${name}, aapka ₹${amt} ka payment complete nahi ho paya. Niche diye link se retry karein.`,
+    english: (name, amt) => `Hello ${name}, your payment of ₹${amt} was unsuccessful. Please use the link below to complete your checkout.`
   }
 };
 
@@ -112,6 +190,9 @@ export async function diagnoseFailure(transaction) {
   }
 
   // LLM Prompt Construction
+  const scenarioType = transaction.scenario_type || "payment_degradation";
+  const scenarioCtx = SCENARIO_CONTEXT[scenarioType] || SCENARIO_CONTEXT.payment_degradation;
+
   const prompt = `You are Retrek AI, an enterprise revenue recovery diagnosis engine for Indian commerce.
 Analyze this payment failure and return ONLY a valid JSON object matching the schema below.
 
@@ -119,10 +200,13 @@ Transaction Telemetry:
 - Transaction ID: ${transaction.id}
 - Amount: ₹${transaction.amount}
 - Customer Name: ${transaction.customer_name || "Customer"}
+- Scenario Type: ${scenarioType}
 - Gateway Decline Code: ${transaction.decline_code}
 - ISO Standard: ${ontology.iso_code} (${ontology.description})
 - Retry Count: ${transaction.retry_count || 0}
 - Customer Past Success Orders: ${transaction.past_success_count || 0}
+
+Scenario Context: ${scenarioCtx}
 
 Required JSON Output Schema:
 {
@@ -132,8 +216,8 @@ Required JSON Output Schema:
   "root_cause": "<technical diagnosis of why the transaction failed>",
   "recovery_probability": <number between 0.00 and 1.00 combining failure type, past successes (+0.02 per order), and retry penalty (-0.20 per retry)>,
   "suggested_action": "AUTO_RETRY" | "MANUAL_REVIEW" | "HARD_STOP_REFUSAL",
-  "customer_message_hinglish": "<empathetic, natural Hinglish recovery text for WhatsApp/SMS mentioning the customer name and amount>",
-  "customer_message_english": "<polite formal English recovery text>",
+  "customer_message_hinglish": "<empathetic, natural Hinglish recovery text matching the scenario above, mentioning customer name and amount>",
+  "customer_message_english": "<polite formal English recovery text matching the scenario above>",
   "reasoning_summary": "<concise explanation of probability and decision logic>"
 }
 
@@ -189,9 +273,9 @@ Output ONLY valid JSON, no markdown formatting.`;
       failure_category: parsed.failure_category || ontology.category,
       root_cause: parsed.root_cause || ontology.description,
       recovery_probability: Number(prob.toFixed(2)),
-      suggested_action: parsed.suggested_action || (prob >= 0.80 ? "AUTO_RETRY" : prob >= 0.50 ? "MANUAL_REVIEW" : "HARD_STOP_REFUSAL"),
-      customer_message_hinglish: parsed.customer_message_hinglish || `Hi ${transaction.customer_name || 'there'}, aapka ₹${transaction.amount} ka payment complete nahi ho paya. Niche diye link se retry karein.`,
-      customer_message_english: parsed.customer_message_english || `Hello ${transaction.customer_name || 'Customer'}, your payment of ₹${transaction.amount} was unsuccessful. Please use the link below to complete your checkout.`,
+      suggested_action: parsed.suggested_action || (prob >= 0.65 ? "AUTO_RETRY" : prob >= 0.50 ? "MANUAL_REVIEW" : "HARD_STOP_REFUSAL"),
+      customer_message_hinglish: parsed.customer_message_hinglish || SCENARIO_FALLBACKS[scenarioType]?.hinglish(transaction.customer_name || 'there', transaction.amount) || SCENARIO_FALLBACKS.payment_degradation.hinglish(transaction.customer_name || 'there', transaction.amount),
+      customer_message_english: parsed.customer_message_english || SCENARIO_FALLBACKS[scenarioType]?.english(transaction.customer_name || 'Customer', transaction.amount) || SCENARIO_FALLBACKS.payment_degradation.english(transaction.customer_name || 'Customer', transaction.amount),
       reasoning_summary: parsed.reasoning_summary || `Evaluated ${ontology.iso_code} with customer loyalty score ${transaction.past_success_count || 0}.`,
       latency_ms: latencyMs
     };
@@ -204,9 +288,9 @@ Output ONLY valid JSON, no markdown formatting.`;
       failure_category: ontology.category,
       root_cause: ontology.description,
       recovery_probability: Number(ontology.base_probability.toFixed(2)),
-      suggested_action: ontology.base_probability >= 0.80 ? "AUTO_RETRY" : "MANUAL_REVIEW",
-      customer_message_hinglish: `Hi ${transaction.customer_name || 'there'}, aapka ₹${transaction.amount} ka payment complete nahi ho paya. Niche diye link se retry karein.`,
-      customer_message_english: `Hello ${transaction.customer_name || 'Customer'}, your payment of ₹${transaction.amount} was unsuccessful. Please retry using the secure link.`,
+      suggested_action: ontology.base_probability >= 0.65 ? "AUTO_RETRY" : "MANUAL_REVIEW",
+      customer_message_hinglish: SCENARIO_FALLBACKS[scenarioType]?.hinglish(transaction.customer_name || 'there', transaction.amount) || SCENARIO_FALLBACKS.payment_degradation.hinglish(transaction.customer_name || 'there', transaction.amount),
+      customer_message_english: SCENARIO_FALLBACKS[scenarioType]?.english(transaction.customer_name || 'Customer', transaction.amount) || SCENARIO_FALLBACKS.payment_degradation.english(transaction.customer_name || 'Customer', transaction.amount),
       reasoning_summary: `AI service fallback mode: applied default ontology mapping for ${ontology.iso_code}.`,
       latency_ms: 0
     };

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { RealtimeProvider } from './context/RealtimeContext';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -55,7 +56,7 @@ function Router() {
       navigate('/login');
       return null;
     }
-    return <Dashboard navigate={navigate} currentPath={currentPath} />;
+    return <RealtimeProvider><Dashboard navigate={navigate} currentPath={currentPath} /></RealtimeProvider>;
   }
 
   // Fallback to Landing page
