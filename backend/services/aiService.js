@@ -193,6 +193,15 @@ export async function diagnoseFailure(transaction) {
   const scenarioType = transaction.scenario_type || "payment_degradation";
   const scenarioCtx = SCENARIO_CONTEXT[scenarioType] || SCENARIO_CONTEXT.payment_degradation;
 
+  const pastSuccessCount = Number(transaction.past_success_count) || 0;
+  const retryCount = Number(transaction.retry_count) || 0;
+  const amount = Number(transaction.amount) || 0;
+
+  const loyaltyBoost = Math.min(0.20, Number((pastSuccessCount * 0.03).toFixed(2)));
+  const retryPenalty = Number((retryCount * 0.15).toFixed(2));
+  const ticketAdjustment = amount < 1000 ? 0.05 : amount >= 30000 ? -0.10 : amount >= 10000 ? -0.05 : 0.00;
+  const calculatedBaseline = Number(Math.max(0.00, Math.min(1.00, ontology.base_probability + loyaltyBoost - retryPenalty + ticketAdjustment)).toFixed(2));
+
   const prompt = `You are Retrek AI, an enterprise revenue recovery diagnosis engine for Indian commerce.
 Analyze this payment failure and return ONLY a valid JSON object matching the schema below.
 
@@ -203,8 +212,15 @@ Transaction Telemetry:
 - Scenario Type: ${scenarioType}
 - Gateway Decline Code: ${transaction.decline_code}
 - ISO Standard: ${ontology.iso_code} (${ontology.description})
-- Retry Count: ${transaction.retry_count || 0}
-- Customer Past Success Orders: ${transaction.past_success_count || 0}
+- Retry Count: ${retryCount}
+- Customer Past Success Orders: ${pastSuccessCount}
+
+Actuarial Weighting Guidelines:
+- Base ISO Probability (P_base): ${ontology.base_probability}
+- Customer Past Successes (${pastSuccessCount} orders): Loyalty Boost +${loyaltyBoost}
+- Retry Count (${retryCount} attempts): Retry Penalty -${retryPenalty}
+- Amount Friction (₹${amount}): Ticket Sensitivity ${ticketAdjustment >= 0 ? "+" + ticketAdjustment : ticketAdjustment}
+- Expected Actuarial Recovery Probability: ~${calculatedBaseline} (adjust slightly based on scenario context, but maintain mathematical rigor).
 
 Scenario Context: ${scenarioCtx}
 
@@ -213,12 +229,19 @@ Required JSON Output Schema:
   "transaction_id": "${transaction.id}",
   "iso_code": "${ontology.iso_code}",
   "failure_category": "${ontology.category}",
-  "root_cause": "<technical diagnosis of why the transaction failed>",
-  "recovery_probability": <number between 0.00 and 1.00 combining failure type, past successes (+0.02 per order), and retry penalty (-0.20 per retry)>,
+  "root_cause": "<deep technical diagnosis of why the transaction failed in this specific business context>",
+  "recovery_probability": <number between 0.00 and 1.00 applying the actuarial weighting>,
+  "probability_breakdown": {
+    "base_probability": ${ontology.base_probability},
+    "loyalty_boost": ${loyaltyBoost},
+    "retry_penalty": ${retryPenalty},
+    "ticket_adjustment": ${ticketAdjustment},
+    "final_probability": <number between 0.00 and 1.00>
+  },
   "suggested_action": "AUTO_RETRY" | "MANUAL_REVIEW" | "HARD_STOP_REFUSAL",
   "customer_message_hinglish": "<empathetic, natural Hinglish recovery text matching the scenario above, mentioning customer name and amount>",
   "customer_message_english": "<polite formal English recovery text matching the scenario above>",
-  "reasoning_summary": "<concise explanation of probability and decision logic>"
+  "reasoning_summary": "<explicit mathematical and behavioral rationale: state how Base P was modified by loyalty (+${loyaltyBoost}), retry fatigue (-${retryPenalty}), and ticket sensitivity (${ticketAdjustment})>"
 }
 
 Output ONLY valid JSON, no markdown formatting.`;
@@ -264,8 +287,16 @@ Output ONLY valid JSON, no markdown formatting.`;
 
     // Sanitize and bound recovery_probability
     let prob = Number(parsed.recovery_probability);
-    if (isNaN(prob)) prob = ontology.base_probability;
+    if (isNaN(prob)) prob = calculatedBaseline;
     prob = Math.max(0.00, Math.min(1.00, prob));
+
+    const breakdown = parsed.probability_breakdown || {
+      base_probability: ontology.base_probability,
+      loyalty_boost: loyaltyBoost,
+      retry_penalty: retryPenalty,
+      ticket_adjustment: ticketAdjustment,
+      final_probability: Number(prob.toFixed(2))
+    };
 
     return {
       transaction_id: transaction.id,
@@ -273,25 +304,33 @@ Output ONLY valid JSON, no markdown formatting.`;
       failure_category: parsed.failure_category || ontology.category,
       root_cause: parsed.root_cause || ontology.description,
       recovery_probability: Number(prob.toFixed(2)),
+      probability_breakdown: breakdown,
       suggested_action: parsed.suggested_action || (prob >= 0.65 ? "AUTO_RETRY" : prob >= 0.50 ? "MANUAL_REVIEW" : "HARD_STOP_REFUSAL"),
       customer_message_hinglish: parsed.customer_message_hinglish || SCENARIO_FALLBACKS[scenarioType]?.hinglish(transaction.customer_name || 'there', transaction.amount) || SCENARIO_FALLBACKS.payment_degradation.hinglish(transaction.customer_name || 'there', transaction.amount),
       customer_message_english: parsed.customer_message_english || SCENARIO_FALLBACKS[scenarioType]?.english(transaction.customer_name || 'Customer', transaction.amount) || SCENARIO_FALLBACKS.payment_degradation.english(transaction.customer_name || 'Customer', transaction.amount),
-      reasoning_summary: parsed.reasoning_summary || `Evaluated ${ontology.iso_code} with customer loyalty score ${transaction.past_success_count || 0}.`,
+      reasoning_summary: parsed.reasoning_summary || `Multi-factor actuarial assessment: Base ${ontology.base_probability} (${ontology.iso_code}) + Loyalty +${loyaltyBoost} (${pastSuccessCount} orders) - Retries -${retryPenalty} + Ticket Adj ${ticketAdjustment} = ${prob.toFixed(2)}.`,
       latency_ms: latencyMs
     };
   } catch (error) {
     console.error(`AI diagnosis exception for ${transaction.id}:`, error.message);
-    // Safe Zero-Risk Fallback
+    // Safe Multi-Factor Fallback
     return {
       transaction_id: transaction.id,
       iso_code: ontology.iso_code,
       failure_category: ontology.category,
       root_cause: ontology.description,
-      recovery_probability: Number(ontology.base_probability.toFixed(2)),
-      suggested_action: ontology.base_probability >= 0.65 ? "AUTO_RETRY" : "MANUAL_REVIEW",
+      recovery_probability: calculatedBaseline,
+      probability_breakdown: {
+        base_probability: ontology.base_probability,
+        loyalty_boost: loyaltyBoost,
+        retry_penalty: retryPenalty,
+        ticket_adjustment: ticketAdjustment,
+        final_probability: calculatedBaseline
+      },
+      suggested_action: calculatedBaseline >= 0.65 ? "AUTO_RETRY" : calculatedBaseline >= 0.50 ? "MANUAL_REVIEW" : "HARD_STOP_REFUSAL",
       customer_message_hinglish: SCENARIO_FALLBACKS[scenarioType]?.hinglish(transaction.customer_name || 'there', transaction.amount) || SCENARIO_FALLBACKS.payment_degradation.hinglish(transaction.customer_name || 'there', transaction.amount),
       customer_message_english: SCENARIO_FALLBACKS[scenarioType]?.english(transaction.customer_name || 'Customer', transaction.amount) || SCENARIO_FALLBACKS.payment_degradation.english(transaction.customer_name || 'Customer', transaction.amount),
-      reasoning_summary: `AI service fallback mode: applied default ontology mapping for ${ontology.iso_code}.`,
+      reasoning_summary: `Multi-factor actuarial assessment: Base ${ontology.base_probability} (${ontology.iso_code}) + Loyalty +${loyaltyBoost} (${pastSuccessCount} orders) - Retries -${retryPenalty} + Ticket Adj ${ticketAdjustment} = ${calculatedBaseline}.`,
       latency_ms: 0
     };
   }

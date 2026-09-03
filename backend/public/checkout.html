@@ -108,10 +108,42 @@
       });
 
       rzp.on('payment.failed', function (response) {
-        status.textContent = 'Payment failed: ' + response.error.description;
+        status.textContent = 'Payment failed: ' + (response.error?.description || 'Declined');
         status.className = 'status error';
         btn.disabled = false;
         btn.textContent = 'Retry Payment';
+
+        if (transactionId) {
+          fetch('/api/webhooks/razorpay', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event: 'payment.failed',
+              payload: {
+                payment: {
+                  entity: {
+                    id: (response.error?.metadata?.payment_id ? response.error.metadata.payment_id + '_' + Date.now() : 'pay_fail_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)),
+                    amount: amount,
+                    status: 'failed',
+                    error_code: response.error?.code || 'BAD_REQUEST_ERROR',
+                    error_description: response.error?.description || 'Payment failed',
+                    error_source: response.error?.source || 'bank',
+                    error_step: response.error?.step || 'payment_authorization',
+                    error_reason: response.error?.reason || 'payment_failed',
+                    notes: {
+                      transaction_id: transactionId,
+                      customer_name: customerName,
+                    }
+                  }
+                }
+              }
+            })
+          }).then(r => r.json()).then(d => {
+            console.log('Backend failure webhook processed:', d);
+          }).catch(err => {
+            console.warn('Backend failure notification failed:', err);
+          });
+        }
       });
 
       rzp.open();

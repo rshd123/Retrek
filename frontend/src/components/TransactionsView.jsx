@@ -223,7 +223,7 @@ export default function TransactionsView({
             disabled={loading || batchProcessing}
             title="Seed synthetic transactions to test AI recovery"
           >
-            {loading ? 'Processing...' : 'Seed 10 Test Cases'}
+            {loading ? 'Processing...' : 'Seed 20 Test Cases'}
           </button>
         </div>
       </div>
@@ -533,11 +533,41 @@ export default function TransactionsView({
                   <strong>Root Cause:</strong> {selectedTx.root_cause || selectedTx.ai_reasoning?.root_cause || 'Click "AI Recover" to diagnose root cause with Groq LLM.'}
                 </p>
 
-                {selectedTx.ai_reasoning?.reasoning_summary && (
+                {(selectedTx.reasoning_summary || selectedTx.ai_reasoning?.reasoning_summary) && (
                   <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
-                    Reasoning: {selectedTx.ai_reasoning.reasoning_summary}
+                    Reasoning: {selectedTx.reasoning_summary || selectedTx.ai_reasoning?.reasoning_summary}
                   </p>
                 )}
+
+                {/* Multi-Factor Actuarial Breakdown */}
+                {(() => {
+                  const bd = selectedTx.probability_breakdown || selectedTx.ai_reasoning?.probability_breakdown;
+                  if (!bd) return null;
+                  return (
+                    <div style={{ marginTop: '10px', padding: '10px 12px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                        Dynamic Multi-Factor Actuarial Weighting
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        <span style={{ fontSize: '12px', background: '#f1f5f9', padding: '3px 8px', borderRadius: '6px', color: '#334155' }}>
+                          Base ISO: <strong>{(Number(bd.base_probability || 0) * 100).toFixed(0)}%</strong>
+                        </span>
+                        <span style={{ fontSize: '12px', background: '#ecfdf5', padding: '3px 8px', borderRadius: '6px', color: '#065f46' }}>
+                          Loyalty: <strong>+{(Number(bd.loyalty_boost || 0) * 100).toFixed(0)}%</strong>
+                        </span>
+                        <span style={{ fontSize: '12px', background: '#fef2f2', padding: '3px 8px', borderRadius: '6px', color: '#991b1b' }}>
+                          Retry Penalty: <strong>-{(Number(bd.retry_penalty || 0) * 100).toFixed(0)}%</strong>
+                        </span>
+                        <span style={{ fontSize: '12px', background: '#f8fafc', padding: '3px 8px', borderRadius: '6px', color: '#475569' }}>
+                          Ticket Sensitivity: <strong>{(Number(bd.ticket_adjustment || 0) >= 0 ? '+' : '') + (Number(bd.ticket_adjustment || 0) * 100).toFixed(0)}%</strong>
+                        </span>
+                        <span style={{ fontSize: '12px', background: '#eff6ff', padding: '3px 8px', borderRadius: '6px', color: '#1d4ed8', fontWeight: '700' }}>
+                          = Final: {(Number(bd.final_probability || selectedTx.recovery_probability || 0) * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* 2. Deterministic Policy Gate Block */}

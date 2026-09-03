@@ -272,6 +272,34 @@ export default function AuditTrail() {
                         {selectedLog.ai_reasoning.reasoning_summary}
                       </p>
                     )}
+                    {(() => {
+                      const bd = selectedLog.ai_reasoning.probability_breakdown;
+                      if (!bd) return null;
+                      return (
+                        <div style={{ marginTop: '10px', padding: '10px 12px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                          <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                            Dynamic Multi-Factor Actuarial Weighting
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            <span style={{ fontSize: '12px', background: '#f1f5f9', padding: '3px 8px', borderRadius: '6px', color: '#334155' }}>
+                              Base ISO: <strong>{(Number(bd.base_probability || 0) * 100).toFixed(0)}%</strong>
+                            </span>
+                            <span style={{ fontSize: '12px', background: '#ecfdf5', padding: '3px 8px', borderRadius: '6px', color: '#065f46' }}>
+                              Loyalty: <strong>+{(Number(bd.loyalty_boost || 0) * 100).toFixed(0)}%</strong>
+                            </span>
+                            <span style={{ fontSize: '12px', background: '#fef2f2', padding: '3px 8px', borderRadius: '6px', color: '#991b1b' }}>
+                              Retry Penalty: <strong>-{(Number(bd.retry_penalty || 0) * 100).toFixed(0)}%</strong>
+                            </span>
+                            <span style={{ fontSize: '12px', background: '#f8fafc', padding: '3px 8px', borderRadius: '6px', color: '#475569' }}>
+                              Ticket Sensitivity: <strong>{(Number(bd.ticket_adjustment || 0) >= 0 ? '+' : '') + (Number(bd.ticket_adjustment || 0) * 100).toFixed(0)}%</strong>
+                            </span>
+                            <span style={{ fontSize: '12px', background: '#eff6ff', padding: '3px 8px', borderRadius: '6px', color: '#1d4ed8', fontWeight: '700' }}>
+                              = Final: {(Number(bd.final_probability || selectedLog.recovery_probability || 0) * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* ISO & Category */}

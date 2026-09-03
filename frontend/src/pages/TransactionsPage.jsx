@@ -9,26 +9,29 @@ export default function TransactionsPage() {
   const [message, setMessage] = useState(null);
   const refetchKey = useRefetchKey();
 
-  const loadTransactions = useCallback(async () => {
-    setLoading(true);
+  const loadTransactions = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const res = await api.getTransactions();
       setTransactions(res.data || []);
+      if (isSilent) setMessage(null);
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Failed to fetch transactions' });
+      if (!isSilent) {
+        setMessage({ type: 'error', text: err.message || 'Failed to fetch transactions' });
+      }
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadTransactions();
+    loadTransactions(false);
   }, [loadTransactions, refetchKey]);
 
-  // Polling fallback: refresh every 5s in case Supabase Realtime misses updates
+  // Polling fallback: refresh silently every 5s without flashing error toasts
   useEffect(() => {
     const interval = setInterval(() => {
-      loadTransactions();
+      loadTransactions(true);
     }, 5000);
     return () => clearInterval(interval);
   }, [loadTransactions]);
