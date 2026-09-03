@@ -1,3 +1,9 @@
+<div align="center">
+
+<img src="./frontend/public/logo.png" alt="Retrek Logo" width="180"/>
+
+</div>
+
 # Retrek
 
 Retrek is an autonomous AI revenue recovery engine for failed payments, checkout drop-offs, subscription failures, B2B receivables, mandate retries, voice recovery, and promise-to-pay follow-ups.
@@ -6,24 +12,38 @@ The app detects failed transactions, diagnoses the likely failure reason with an
 
 ## What It Does
 
-- Ingests failed payment transactions manually or from webhook-like payloads.
-- Maps gateway decline codes to ISO-8583-style failure categories.
-- Uses Groq LLM inference to produce root-cause analysis, recovery probability, and customer recovery messages.
-- Applies a deterministic policy gate before any recovery action is executed.
-- Creates Razorpay payment links for approved recoverable cases.
-- Handles Razorpay webhook callbacks with idempotency protection.
-- Provides protected dashboards for transactions, ROI metrics, audit logs, benchmark results, system health, ingestion, and recovery tracking.
-- Supports Supabase Realtime updates for transaction and audit-log changes.
+- **Multi-Source Ingestion:** Ingests failed transactions from live Razorpay `payment.failed` webhooks, CSV batches, or manual entries.
+- **ISO-8583 Banking Ontology:** Maps 16 gateway decline codes into standard international banking failure categories.
+- **Dynamic Actuarial AI:** Uses Groq (`qwen/qwen3.6-27b`) to evaluate root cause and calculate dynamic recovery probability combining Base ISO risk, customer loyalty history (+3%/order), retry fatigue (-15%/attempt), and ticket size.
+- **3-Gate Deterministic Policy Engine:** Strict guardrails enforce auto-execution (<₹10k, ≥65% viability), human swipe approval, or stop rules (fraud, max retries, customer fatigue).
+- **Razorpay Order Execution:** Creates Razorpay payment orders with bounded idempotency locks.
+- **Live Webhook Confirmation:** Catches payment success and failure callbacks with HMAC SHA-256 verification to update recovery status in real time.
+- **Real-Time Dashboards:** Protected interfaces for transaction management, ROI metrics, immutable audit trail, automated 5-pillar benchmark, and recovery tracking.
+- **Supabase Realtime:** Instant live WebSocket state synchronization across all connected clients.
 
 ## Tech Stack
 
-- Frontend: React 19, Vite, Tailwind CSS 4, Supabase JS
-- Backend: Node.js, Express 5, JWT auth, bcrypt
-- Database: Supabase PostgreSQL
-- AI: Groq SDK
-- Payments: Razorpay Payment Links API
-- Tunneling: ngrok for local Razorpay webhook testing
-- Deployment target: Vercel serverless backend routing
+<div align="center">
+
+![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-Auth%20%26%20Database-3ECF8E?style=flat-square&logo=supabase&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-JSONB%20%26%20Locks-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-20-339933?style=flat-square&logo=node.js&logoColor=white)
+![Express](https://img.shields.io/badge/Express-5-000000?style=flat-square&logo=express&logoColor=white)
+![JWT](https://img.shields.io/badge/JWT-Authentication-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)
+![bcrypt](https://img.shields.io/badge/bcrypt-Password%20Hashing-338033?style=flat-square)
+![Groq](https://img.shields.io/badge/Groq-LPU_Inference-F55036?style=flat-square)
+![Qwen](https://img.shields.io/badge/Model-Qwen_3.6_27B-6366F1?style=flat-square)
+![Razorpay](https://img.shields.io/badge/Razorpay-Orders%20%26%20Checkout-528FF0?style=flat-square)
+![ISO-8583](https://img.shields.io/badge/Banking_Standard-ISO--8583-0284C7?style=flat-square)
+![WebSockets](https://img.shields.io/badge/Supabase-Realtime%20WebSockets-3ECF8E?style=flat-square)
+![HMAC SHA256](https://img.shields.io/badge/Security-HMAC%20SHA--256-D97706?style=flat-square)
+![ngrok](https://img.shields.io/badge/ngrok-Webhooks-1F1F1F?style=flat-square&logo=ngrok&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-Deployment-000000?style=flat-square&logo=vercel&logoColor=white)
+
+</div>
 
 ## Repository Layout
 
@@ -43,7 +63,7 @@ Retrek/
 - Supabase project
 - Groq API key
 - Razorpay test account and API keys
-- ngrok account token, only if testing webhooks locally
+- ngrok account token (optional, for local webhook tunneling)
 
 ## Local Setup
 
@@ -90,12 +110,6 @@ JWT_SECRET=replace_with_a_strong_secret
 NGROK_AUTHTOKEN=your_ngrok_authtoken
 ```
 
-Notes:
-
-- `SUPABASE_SERVICE_ROLE_KEY` is preferred for backend writes because it bypasses RLS.
-- `SUPABASE_ANON_KEY` or `SUPABASE_PUBLISHABLE_KEY` can be used as a fallback, but writes may fail if RLS policies are not configured.
-- `TEST_API_KEY` is used as the Razorpay key id in the current backend service.
-
 ## Frontend Environment
 
 Add these values to `frontend/.env`:
@@ -106,7 +120,7 @@ VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-For local development, you may omit `VITE_API_URL`; Vite proxies `/api` to `http://localhost:5000`.
+*For local development, you may omit `VITE_API_URL`; Vite proxies `/api` to `http://localhost:5000`.*
 
 ## Database Tables
 
@@ -132,6 +146,8 @@ create table transactions (
   scenario_type text default 'payment_degradation',
   status text default 'FAILED',
   payment_link_url text,
+  next_retry_at timestamptz,
+  ptp_date timestamptz,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -159,44 +175,35 @@ create table webhook_events (
 );
 ```
 
-Enable Supabase Realtime for `transactions` and `audit_logs` if you want dashboard views to refresh automatically.
+*Enable Supabase Realtime for `transactions` and `audit_logs` so dashboard views refresh automatically.*
 
 ## Running Locally
 
-Start the backend:
+Start the backend (automatically boots Express, Scheduler, and ngrok tunnel):
 
 ```bash
 cd backend
 npm run dev
 ```
 
-The backend runs on:
-
-```text
-http://localhost:5000
-```
-
-Start the frontend in another terminal:
+Start the frontend:
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-The frontend runs on:
-
-```text
-http://localhost:5173
-```
+The app runs on:
+* Frontend: `http://localhost:5173`
+* Backend API: `http://localhost:5000`
 
 ## Common Workflow
 
-1. Open the frontend at `http://localhost:5173`.
-2. Sign up or log in.
-3. Seed sample transactions from the Transactions page or call the seed API.
-4. Run AI processing for failed transactions.
-5. Review ROI, audit logs, benchmark results, and system health from the dashboard.
-6. Use the Ingest page to add a custom failed transaction and process it immediately.
+1. Open `http://localhost:5173` and sign up or log in.
+2. Click **"Seed Sample Data"** on the Transactions page or run the Benchmark.
+3. Observe real-time AI diagnoses and policy decisions across the 7 scenarios.
+4. Review ROI metrics, audit logs, and system health in the dashboard.
+5. Ingest custom live failures via webhook or manual ingestion.
 
 ## Scripts
 
@@ -205,7 +212,6 @@ Backend:
 ```bash
 cd backend
 npm run dev
-npm run tunnel
 node scripts/seedTransactions.js
 node scripts/runBenchmark.js
 node scripts/checkTables.js
@@ -234,13 +240,7 @@ POST /api/auth/login
 POST /api/webhooks/razorpay
 ```
 
-Protected endpoints require:
-
-```text
-Authorization: Bearer <jwt_token>
-```
-
-Protected transaction endpoints:
+Protected endpoints (`Authorization: Bearer <jwt_token>`):
 
 ```text
 GET  /api/transactions
@@ -250,27 +250,19 @@ POST /api/transactions/ingest
 POST /api/transactions/batch-process
 POST /api/transactions/:id/process
 GET  /api/transactions/scenarios
-```
 
-Protected approval endpoints:
-
-```text
 GET  /api/approvals/pending
 POST /api/approvals/:id/approve
 POST /api/approvals/:id/decline
+
+GET  /api/dashboard/roi
+GET  /api/audit-logs/logs
+GET  /api/ai/llmTest
+GET  /api/benchmark/run
+GET  /api/benchmark/results
 ```
 
-Protected dashboard, audit, AI, and benchmark endpoints:
-
-```text
-GET /api/dashboard/roi
-GET /api/audit-logs/logs
-GET /api/ai/llmTest
-GET /api/benchmark/run
-GET /api/benchmark/results
-```
-
-See `backend/ENDPOINTS.md` for more endpoint details.
+See `backend/ENDPOINTS.md` for full parameter and payload documentation.
 
 ## Frontend Routes
 
@@ -288,52 +280,39 @@ See `backend/ENDPOINTS.md` for more endpoint details.
 /dashboard/tracker        Recovery tracker
 ```
 
-## Webhook Testing
+## Webhook Handling
 
-For local Razorpay webhook testing:
-
-```bash
-cd backend
-npm run tunnel
-```
-
-Copy the generated webhook URL into the Razorpay dashboard:
-
-```text
-https://<your-ngrok-domain>/api/webhooks/razorpay
-```
-
-The webhook route handles payment success events such as `payment_link.paid`, `payment.captured`, and `payment.authorized`, and payment-link failure events such as `payment_link.expired`, `payment_link.cancelled`, and `payment_link.failed`.
+The webhook route (`/api/webhooks/razorpay`) handles:
+* **Payment Recoveries:** `payment_link.paid`, `payment.captured`, and `payment.authorized` (marks transactions `RECOVERED`).
+* **Live Checkout Failures:** `payment.failed` (normalizes gateway error reasons into ISO ontology and auto-triggers recovery).
+* **Payment Expirations:** `payment_link.expired`, `payment_link.cancelled`, and `payment_link.failed`.
+* **Idempotency:** Atomic deduplication locks using PostgreSQL primary keys prevent duplicate processing.
 
 ## Benchmarking
 
-Run the benchmark through the backend script:
+Run the automated evaluation suite via CLI:
 
 ```bash
 cd backend
 node scripts/runBenchmark.js
 ```
 
-Or call the API:
+Or view the visual benchmark suite directly on the frontend at `/dashboard/benchmark`.
 
-```bash
-curl http://localhost:5000/api/benchmark/run \
-  -H "Authorization: Bearer <jwt_token>"
-```
+Evaluates the 5 core pillars:
+1. **Adversarial Safety & Fraud Refusal** (100% Target)
+2. **Webhook Idempotency & Deduplication** (100% Target)
+3. **Policy Engine Evaluation Latency** (<50ms Target)
+4. **Audit Provenance Coverage** (100% Target)
+5. **7-Scenario Coverage & Recovery Yield** (100% Target)
 
-Benchmark output is written to:
-
-```text
-backend/data/benchmark_results.json
-```
-
-The benchmark uses `backend/data/batch_transactions.json` and evaluates safety refusal, webhook idempotency, policy latency, audit provenance, scenario coverage, and recoverable revenue yield.
+Benchmark output is stored in `backend/data/benchmark_results.json`.
 
 ## Deployment
 
 The included `vercel.json` routes all requests to `backend/server.js` for Vercel serverless deployment.
 
-Before deploying, configure the same backend environment variables in Vercel. For a separate frontend deployment, configure:
+Before deploying, configure the backend environment variables in Vercel. For a separate frontend deployment, configure:
 
 ```env
 VITE_API_URL=https://your-backend-domain/api
@@ -343,13 +322,13 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 ## Documentation
 
-- `docs/PROBLEM_STATEMENT.md` - challenge context and goals
-- `docs/SOLUTION.md` - full submission notes
-- `docs/AI-ENGINE-PIPELINE.md` - AI diagnosis and recovery pipeline details
-- `docs/BENCHMARK.md` - benchmark and evaluation notes
-- `docs/MEMORY.md` - project memory and progress notes
-- `backend/ENDPOINTS.md` - backend API documentation
-- `frontend/ROUTES.md` - frontend route notes
+- `docs/PROBLEM_STATEMENT.md` — Challenge context and goals
+- `docs/SOLUTION.md` — Full submission notes and architecture
+- `docs/AI-ENGINE-PIPELINE.md` — AI diagnosis and recovery pipeline details
+- `docs/BENCHMARK.md` — Benchmark methodology and held-out dataset
+- `docs/MEMORY.md` — Project memory and progress notes
+- `backend/ENDPOINTS.md` — Backend API documentation
+- `frontend/ROUTES.md` — Frontend route notes
 
 ## Safety Notes
 
