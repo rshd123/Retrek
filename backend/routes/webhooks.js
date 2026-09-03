@@ -63,6 +63,63 @@ router.post("/razorpay/confirm", async (req, res) => {
   }
 });
 
+export function mapRazorpayErrorToDeclineCode(paymentEntity) {
+  const reason = String(paymentEntity?.error_reason || "").toLowerCase();
+  const source = String(paymentEntity?.error_source || "").toLowerCase();
+  const step = String(paymentEntity?.error_step || "").toLowerCase();
+  const description = String(paymentEntity?.error_description || "").toLowerCase();
+
+  if (
+    reason.includes("risk") ||
+    reason.includes("fraud") ||
+    description.includes("fraud") ||
+    description.includes("security")
+  ) {
+    return "SUSPECTED_FRAUD";
+  }
+
+  if (
+    reason.includes("insufficient") ||
+    reason.includes("balance") ||
+    description.includes("insufficient")
+  ) {
+    return "INSUFFICIENT_FUNDS";
+  }
+
+  if (
+    reason.includes("limit") ||
+    description.includes("limit exceeded")
+  ) {
+    return "CARD_LIMIT_EXCEEDED";
+  }
+
+  if (
+    reason.includes("expired") ||
+    description.includes("expired")
+  ) {
+    return "EXPIRED_CARD";
+  }
+
+  if (
+    step.includes("authentication") ||
+    reason.includes("otp") ||
+    description.includes("otp") ||
+    description.includes("2fa")
+  ) {
+    return "BANK_TIMEOUT_2FA";
+  }
+
+  if (
+    source.includes("gateway") ||
+    reason.includes("gateway") ||
+    (source.includes("bank") && step.includes("authorization"))
+  ) {
+    return "BANK_TIMEOUT_GATEWAY";
+  }
+
+  return "ISSUER_DECLINED_GENERIC";
+}
+
 // POST /api/webhooks/razorpay — Receive Razorpay payment events
 router.post("/razorpay", async (req, res) => {
   try {
@@ -150,7 +207,8 @@ router.post("/razorpay", async (req, res) => {
     // Always proceed to extract and update the transaction
     const paymentEntity = event.payload?.payment_link?.entity;
     const paymentEntity2 = event.payload?.payment?.entity;
-    const referenceId = paymentEntity?.reference_id || paymentEntity2?.notes?.transaction_id;
+    const activeEntity = paymentEntity2 || paymentEntity;
+    const referenceId = paymentEntity?.reference_id || paymentEntity2?.notes?.transaction_id || paymentEntity2?.id;
 
     console.log(`📩 Webhook: ${eventType} | Event: ${eventId} | Ref: ${referenceId} | Entity: ${paymentEntity ? "payment_link" : paymentEntity2 ? "payment" : "none"}`);
 
@@ -186,23 +244,67 @@ router.post("/razorpay", async (req, res) => {
       }
     }
 
-    // Handle payment_link.expired / payment_link.cancelled / payment_link.failed — trigger recovery pipeline
-    if (eventType === "payment_link.expired" || eventType === "payment_link.cancelled" || eventType === "payment_link.failed") {
+    // Handle payment.failed / payment_link.expired / payment_link.cancelled / payment_link.failed — trigger recovery pipeline
+    if (
+      eventType === "payment.failed" ||
+      eventType === "payment_link.expired" ||
+      eventType === "payment_link.cancelled" ||
+      eventType === "payment_link.failed"
+    ) {
       if (referenceId) {
         console.log(`❌ Payment ${eventType} for ${referenceId} — triggering recovery pipeline`);
 
-        const { data: transaction } = await supabase
+        let { data: transaction } = await supabase
           .from("transactions")
           .select("*")
           .eq("id", referenceId)
           .single();
 
+        if (!transaction) {
+          const declineCode = mapRazorpayErrorToDeclineCode(activeEntity);
+          const rawAmount = activeEntity?.amount ? Number(activeEntity.amount) : 0;
+          const amount = paymentEntity ? rawAmount : (rawAmount > 0 ? rawAmount / 100 : 0);
+          const customerName = activeEntity?.notes?.customer_name || (activeEntity?.email ? activeEntity.email.split("@")[0] : null) || activeEntity?.contact || "Customer";
+          const scenarioType = activeEntity?.notes?.scenario_type || "payment_degradation";
+
+          const { data: insertedTxn, error: insErr } = await supabase
+            .from("transactions")
+            .upsert({
+              id: referenceId,
+              amount,
+              decline_code: declineCode,
+              customer_name: customerName,
+              customer_id: activeEntity?.customer_id || activeEntity?.contact || null,
+              scenario_type: scenarioType,
+              status: "FAILED",
+              retry_count: 0,
+              past_success_count: Number(activeEntity?.notes?.past_success_count) || 0,
+            })
+            .select()
+            .single();
+
+          if (!insErr && insertedTxn) {
+            transaction = insertedTxn;
+          }
+        } else if (activeEntity?.error_reason || activeEntity?.error_code) {
+          const mappedCode = mapRazorpayErrorToDeclineCode(activeEntity);
+          if (mappedCode && (!transaction.decline_code || transaction.decline_code === "FAILED")) {
+            transaction.decline_code = mappedCode;
+            await supabase.from("transactions").update({ decline_code: mappedCode }).eq("id", referenceId);
+          }
+        }
+
         if (transaction) {
+          const currentRetries = Number(transaction.retry_count) || 0;
+          const nextRetryCount = currentRetries + 1;
+          transaction.retry_count = nextRetryCount;
+
           const diagnosis = await diagnoseFailure(transaction);
           const policy = evaluatePolicy(transaction, diagnosis);
 
           let newStatus = transaction.status;
           let actionTaken = policy.gate_decision;
+          let newPaymentLinkUrl = null;
 
           if (policy.gate_decision === "STOP_RULE") {
             newStatus = "STOPPED";
@@ -213,6 +315,7 @@ router.post("/razorpay", async (req, res) => {
               const paymentLink = await createPaymentLink(transaction, diagnosis.customer_message_hinglish);
               newStatus = "LINK_SENT";
               actionTaken = "AUTO_EXECUTE_LINK_SENT";
+              newPaymentLinkUrl = paymentLink.payment_link_url;
               console.log(`🔗 New payment link created for ${referenceId}: ${paymentLink.payment_link_url}`);
             } catch (linkError) {
               console.error(`Payment link re-creation failed for ${referenceId}:`, linkError.message);
@@ -223,7 +326,11 @@ router.post("/razorpay", async (req, res) => {
 
           await supabase
             .from("transactions")
-            .update({ status: newStatus })
+            .update({
+              status: newStatus,
+              retry_count: nextRetryCount,
+              ...(newPaymentLinkUrl ? { payment_link_url: newPaymentLinkUrl } : {})
+            })
             .eq("id", referenceId);
 
           await supabase.from("audit_logs").insert({
