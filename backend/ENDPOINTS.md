@@ -89,4 +89,30 @@ API call → Authorization: Bearer <token> → middleware verifies → request p
 
 ---
 
+## 12. Database Reset & Development Utilities
+
+### Complete Database Reset (Public — Zero Auth Required)
+- ✅ **`POST /api/reset`** (also supports **`GET`** and **`DELETE`**) — `routes/health.js`
+  - **Purpose:** Wipes all transactional data (`audit_logs`, `webhook_events`, `transactions`) back to **0 rows** so you can test fresh from scratch with Thunder Client, Postman, or directly in a browser tab.
+  - **Headers:** *None required* (no JWT Bearer token needed).
+  - **Safety Invariant:** Preserves the `users` table so your login credentials and active sessions are not lost.
+  - **Also Available Under:** `POST /api/transactions/reset` (requires Bearer token if called through transactions router).
+  - **Sample Success Response (`200 OK`):**
+    ```json
+    {
+      "success": true,
+      "message": "Database reset to 0 rows. All transactional data cleared.",
+      "deleted_counts": {
+        "audit_logs": 20,
+        "webhook_events": 2,
+        "transactions": 20
+      },
+      "current_counts": {
+        "audit_logs": 0,
+        "webhook_events": 0,
+        "transactions": 0
+      },
+      "timestamp": "2026-09-03T00:03:18.123Z"
+    }
+    ```
 

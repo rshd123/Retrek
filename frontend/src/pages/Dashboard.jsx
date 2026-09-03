@@ -85,28 +85,16 @@ export default function Dashboard({ navigate, currentPath }) {
     navigate(path);
   };
 
-  const renderContent = () => {
-    switch (activeKey) {
-      case 'home':
-        return <DashboardHome navigate={navigate} />;
-      case 'roi':
-        return <ROIMetrics />;
-      case 'transactions':
-        return <TransactionsPage />;
-      case 'audit':
-        return <AuditTrail />;
-      case 'benchmark':
-        return <BenchmarkPage />;
-      case 'system':
-        return <SystemHealth />;
-      case 'ingest':
-        return <IngestPage />;
-      case 'tracker':
-        return <RecoveryTracker />;
-      default:
-        return <DashboardHome navigate={navigate} />;
-    }
-  };
+  const pages = [
+    { key: 'home', component: <DashboardHome navigate={navigate} /> },
+    { key: 'roi', component: <ROIMetrics /> },
+    { key: 'transactions', component: <TransactionsPage /> },
+    { key: 'audit', component: <AuditTrail /> },
+    { key: 'benchmark', component: <BenchmarkPage /> },
+    { key: 'system', component: <SystemHealth /> },
+    { key: 'ingest', component: <IngestPage /> },
+    { key: 'tracker', component: <RecoveryTracker /> },
+  ];
 
   return (
     <div className="dashboard-layout">
@@ -182,7 +170,14 @@ export default function Dashboard({ navigate, currentPath }) {
 
         {/* Content Area */}
         <main className="dashboard-content">
-          {renderContent()}
+          {pages.map((page) => (
+            <div
+              key={page.key}
+              style={{ display: activeKey === page.key ? 'block' : 'none' }}
+            >
+              {page.component}
+            </div>
+          ))}
         </main>
       </div>
       {/* Toast Notification */}

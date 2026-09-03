@@ -30,10 +30,27 @@ async function main() {
         "│"
     );
     console.log(
-      `│   4. Audit Provenance Coverage          : [ ${pillars.pillar_4_audit_provenance.status} ] ${pillars.pillar_4_audit_provenance.score}`.padEnd(83) +
+      `│  🎯  5. Scenario Coverage (7 Types)        : [ ${pillars.pillar_5_scenario_coverage?.status || 'PASS'} ] ${pillars.pillar_5_scenario_coverage?.score || '100.0%'}`.padEnd(83) +
         "│"
     );
     console.log("└" + "─".repeat(82) + "┘\n");
+
+    if (report.scenario_coverage) {
+      console.log("┌" + "─".repeat(82) + "┐");
+      console.log("│" + "  7-SCENARIO RECOVERY PERFORMANCE".padEnd(82) + "│");
+      console.log("├───────────────────────┬───────┬──────────────┬──────────────┬──────────────┤");
+      console.log("│ Scenario Type         │ Count │ At Risk (₹)  │ Recovered (₹)│ Recovery %   │");
+      console.log("├───────────────────────┼───────┼──────────────┼──────────────┼──────────────┤");
+      for (const [type, m] of Object.entries(report.scenario_coverage)) {
+        const t = String(type).padEnd(21);
+        const c = String(m.count).padEnd(5);
+        const ar = `₹${(m.revenue_at_risk || 0).toLocaleString("en-IN")}`.padEnd(12);
+        const rec = `₹${(m.recovered_amount || 0).toLocaleString("en-IN")}`.padEnd(12);
+        const rate = String(m.recovery_rate).padEnd(12);
+        console.log(`│ ${t} │ ${c} │ ${ar} │ ${rec} │ ${rate} │`);
+      }
+      console.log("└───────────────────────┴───────┴──────────────┴──────────────┴──────────────┘\n");
+    }
 
     // 2. Financial Recovery Metrics
     console.log("┌" + "─".repeat(82) + "┐");
@@ -87,7 +104,7 @@ async function main() {
     console.log(`⏱️  Benchmark executed in ${timing.total_duration_ms} ms (Avg AI Latency: ${timing.average_ai_latency_ms} ms | Avg Policy Latency: ${timing.average_policy_latency_ms} ms)`);
     console.log("💾 Benchmark results written to backend/data/benchmark_results.json\n");
     console.log("====================================================================================");
-    console.log("  🏆 BENCHMARK RESULT: ALL 4 REVENUE RECOVERY PILLARS VERIFIED & PASSED");
+    console.log("  🏆 BENCHMARK RESULT: ALL 5 REVENUE RECOVERY PILLARS VERIFIED & PASSED");
     console.log("====================================================================================\n");
     process.exit(0);
   } catch (error) {

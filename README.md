@@ -228,6 +228,7 @@ Public endpoints:
 
 ```text
 GET  /api/health
+POST /api/reset
 POST /api/auth/signup
 POST /api/auth/login
 POST /api/webhooks/razorpay

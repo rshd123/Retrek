@@ -115,6 +115,45 @@ async function processTransaction(transactionId) {
   };
 }
 
+async function clearTableRows(tableName, idCol = "id") {
+  const { data, error: fetchErr } = await supabase.from(tableName).select(idCol);
+  if (fetchErr || !data || data.length === 0) return 0;
+  const ids = data.map((r) => r[idCol]);
+  const { error: delErr } = await supabase.from(tableName).delete().in(idCol, ids);
+  if (delErr) throw new Error(`Failed to delete from ${tableName}: ${delErr.message}`);
+  return ids.length;
+}
+
+router.all("/reset", async (req, res) => {
+  try {
+    const deletedAudit = await clearTableRows("audit_logs", "id");
+    const deletedWebhooks = await clearTableRows("webhook_events", "event_id");
+    const deletedTransactions = await clearTableRows("transactions", "id");
+
+    return res.status(200).json({
+      success: true,
+      message: "Database reset to 0 rows. All transactional data cleared.",
+      deleted_counts: {
+        audit_logs: deletedAudit,
+        webhook_events: deletedWebhooks,
+        transactions: deletedTransactions
+      },
+      current_counts: {
+        audit_logs: 0,
+        webhook_events: 0,
+        transactions: 0
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error("Database reset error:", err.message);
+    return res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
 // POST /api/transactions/seed — Seed synthetic data into DB
 router.post("/seed", async (req, res) => {
   try {

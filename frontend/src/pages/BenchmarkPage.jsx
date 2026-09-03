@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { api } from '../services/api';
+import ScenarioBadge from '../components/ScenarioBadge';
 
 const PILLAR_META = [
   { key: 'pillar_1_adversarial_safety', label: 'Adversarial Safety & Fraud Refusal', target: '100%' },
   { key: 'pillar_2_webhook_idempotency', label: 'Webhook Deduplication Rate', target: '100%' },
   { key: 'pillar_3_policy_latency', label: 'Policy Evaluation Latency', target: '< 50ms' },
   { key: 'pillar_4_audit_provenance', label: 'Audit Provenance Coverage', target: '100%' },
+  { key: 'pillar_5_scenario_coverage', label: 'Scenario Coverage (7 Types)', target: '100%' },
 ];
 
 export default function BenchmarkPage() {
@@ -42,7 +44,7 @@ export default function BenchmarkPage() {
       <div className="view-header">
         <div>
           <h2 className="view-title">Benchmark & Evaluation</h2>
-          <p className="view-subtitle">Automated evaluation suite across 4 core safety & performance pillars</p>
+          <p className="view-subtitle">Automated evaluation suite across 5 core safety & performance pillars</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-outline" onClick={loadCached} disabled={running}>
@@ -87,7 +89,7 @@ export default function BenchmarkPage() {
             Executing benchmark suite...
           </p>
           <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>
-            Processing 10 test scenarios + webhook stress test + latency measurement
+            Processing 20 test scenarios across 7 scenario types + webhook stress test + latency measurement
           </p>
         </div>
       )}
@@ -223,6 +225,70 @@ export default function BenchmarkPage() {
             </div>
           </div>
 
+          {/* 7-Scenario Recovery Performance */}
+          {report.scenario_coverage && Object.keys(report.scenario_coverage).length > 0 && (
+            <div style={{ marginBottom: '28px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '14px', color: 'var(--text)' }}>
+                7-Scenario Recovery Performance
+              </h3>
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid rgba(23, 79, 67, 0.1)',
+                borderRadius: '12px',
+                overflow: 'hidden',
+              }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '750px' }}>
+                    <thead>
+                      <tr style={{ background: '#f8f7f1' }}>
+                        {['Scenario Type', 'Test Cases', 'Revenue At Risk', 'Recovered Amount', 'Recovery Rate', 'Gate Breakdown'].map((h) => (
+                          <th key={h} style={{
+                            padding: '12px 14px',
+                            textAlign: h === 'Scenario Type' || h === 'Gate Breakdown' ? 'left' : 'right',
+                            fontWeight: '700',
+                            fontSize: '11px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                            color: '#64748b',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(report.scenario_coverage).map(([type, data]) => (
+                        <tr key={type} style={{ borderBottom: '1px solid rgba(23, 79, 67, 0.06)' }}>
+                          <td style={{ padding: '10px 14px' }}>
+                            <ScenarioBadge scenarioType={type} />
+                          </td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '600' }}>
+                            {data.count}
+                          </td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '600' }}>
+                            ₹{Number(data.revenue_at_risk || 0).toLocaleString('en-IN')}
+                          </td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '700', color: '#174f43' }}>
+                            ₹{Number(data.recovered_amount || 0).toLocaleString('en-IN')}
+                          </td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '700', color: '#38a169' }}>
+                            {data.recovery_rate}
+                          </td>
+                          <td style={{ padding: '10px 14px' }}>
+                            <span style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace' }}>
+                              Auto: {data.gate_breakdown?.AUTO_EXECUTE || 0} | Human: {data.gate_breakdown?.HUMAN_APPROVAL || 0} | Stop: {data.gate_breakdown?.STOP_RULE || 0}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Timing */}
           <div style={{ marginBottom: '28px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '14px', color: 'var(--text)' }}>
@@ -290,10 +356,10 @@ export default function BenchmarkPage() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '900px' }}>
                     <thead>
                       <tr style={{ background: '#f8f7f1' }}>
-                        {['ID', 'Customer', 'Amount', 'Decline Code', 'Recovery %', 'Gate Decision', 'Status', 'AI Latency', 'Policy Latency', 'Expected'].map((h) => (
+                        {['ID', 'Scenario Type', 'Customer', 'Amount', 'Decline Code', 'Recovery %', 'Gate Decision', 'Status', 'AI Latency', 'Policy Latency', 'Expected'].map((h) => (
                           <th key={h} style={{
                             padding: '12px 14px',
-                            textAlign: h === 'Customer' || h === 'Decline Code' || h === 'Gate Decision' || h === 'Status' ? 'left' : 'right',
+                            textAlign: h === 'ID' || h === 'Scenario Type' || h === 'Customer' || h === 'Decline Code' || h === 'Gate Decision' || h === 'Status' ? 'left' : 'right',
                             fontWeight: '700',
                             fontSize: '11px',
                             textTransform: 'uppercase',
@@ -311,6 +377,9 @@ export default function BenchmarkPage() {
                         <tr key={sc.transaction_id || i} style={{ borderBottom: '1px solid rgba(23, 79, 67, 0.06)' }}>
                           <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: '12px', fontWeight: '600' }}>
                             {sc.transaction_id}
+                          </td>
+                          <td style={{ padding: '10px 14px' }}>
+                            <ScenarioBadge scenarioType={sc.scenario_type || 'payment_degradation'} />
                           </td>
                           <td style={{ padding: '10px 14px', fontWeight: '600' }}>
                             {sc.customer_name}
