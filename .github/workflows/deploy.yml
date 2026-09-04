@@ -13,6 +13,9 @@ jobs:
         with:
           node-version: 24
       - run: npm install -g vercel
+      - run: vercel link --yes --project retrek-backend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - run: vercel --yes --prod
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -26,6 +29,10 @@ jobs:
         with:
           node-version: 24
       - run: npm install -g vercel
+      - run: vercel link --yes --project retrek-frontend
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - run: vercel --yes --prod
         working-directory: frontend
         env:

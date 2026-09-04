@@ -7,7 +7,15 @@
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/api/(.*)",
+      "dest": "backend/server.js"
+    },
+    {
+      "src": "/ai/(.*)",
+      "dest": "backend/server.js"
+    },
+    {
+      "src": "/checkout",
       "dest": "backend/server.js"
     }
   ]

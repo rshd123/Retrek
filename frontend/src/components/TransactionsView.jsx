@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import ScenarioBadge from './ScenarioBadge';
 import SwipeToApprove from './SwipeToApprove';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const BACKEND_BASE = API_BASE.replace(/\/api\/?$/, '');
 
 function resolveCheckoutUrl(url) {
