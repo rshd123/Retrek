@@ -21,6 +21,90 @@ The app detects failed transactions, diagnoses the likely failure reason with an
 - **Real-Time Dashboards:** Protected interfaces for transaction management, ROI metrics, immutable audit trail, automated 5-pillar benchmark, and recovery tracking.
 - **Supabase Realtime:** Instant live WebSocket state synchronization across all connected clients.
 
+## System Architecture
+
+<div align="center">
+
+```mermaid
+flowchart TD
+    subgraph INGEST["1. Ingestion Layer"]
+        W1["Live Razorpay Webhook<br/>(payment.failed / link.expired)"]
+        W2["Batch Dataset Ingest<br/>(20 Scenarios across 7 Types)"]
+        W3["Manual / API Ingest<br/>(/api/transactions/ingest)"]
+    end
+
+    subgraph DIAGNOSE["2. Cognitive AI Diagnosis Engine"]
+        ISO["ISO-8583 Banking Ontology<br/>(16 Decline Codes Mapped)"]
+        ACT["Dynamic Multi-Factor Actuarial Model<br/>Base ISO Risk ± Loyalty Boost (+3%)<br/>- Retry Penalty (-15%) ± Ticket Sensitivity"]
+        LLM["Groq LPU Inference<br/>(Model: qwen/qwen3.6-27b)"]
+        OUT["Empathetic Hinglish Outreach<br/>& Voice Call Scripts"]
+    end
+
+    subgraph POLICY["3. Deterministic 3-Gate Policy Engine"]
+        G1["Gate 1: AUTO_EXECUTE<br/>Viability ≥ 65% · Ticket < ₹10k · Retries Safe"]
+        G2["Gate 2: HUMAN_APPROVAL<br/>Viability 50-64% OR High-Ticket ≥ ₹10k"]
+        G3["Gate 3: STOP_RULE<br/>Fraud Flag · Max Retries Hit · Viability < 50%"]
+    end
+
+    subgraph ACT_LAYER["4. Execution Layer"]
+        RZP["Razorpay Orders & Payment Links<br/>(/v1/orders with Idempotency)"]
+        MODAL["Embedded Razorpay Checkout<br/>(Checkout.js Modal on /checkout)"]
+        SWIPE["Merchant Approval Queue<br/>(1-Click Swipe Approve / Decline)"]
+        STOP["Recovery Halted<br/>(Anti-Spam & Bounce Fee Protection)"]
+    end
+
+    subgraph VERIFY["5. Verification & Ledger Layer"]
+        WH_VERIFY["Webhook Verification<br/>(HMAC SHA-256 Signature Check)"]
+        DEDUP["PostgreSQL Atomic Lock<br/>(PRIMARY KEY event_id Deduplication)"]
+        AUDIT["Immutable Audit Trail<br/>(Supabase JSONB Provenance Ledger)"]
+        WS["Supabase Realtime (WebSockets)<br/>Instant Push to React 19 Frontend"]
+    end
+
+    %% Connections
+    W1 --> ISO
+    W2 --> ISO
+    W3 --> ISO
+
+    ISO --> ACT
+    ACT --> LLM
+    LLM --> OUT
+
+    OUT --> G1
+    OUT --> G2
+    OUT --> G3
+
+    G1 -->|Auto-Dispatch| RZP
+    G2 -->|Escalate| SWIPE
+    G3 -->|Permanent Block| STOP
+
+    SWIPE -->|Merchant Approved| RZP
+    SWIPE -->|Merchant Declined| STOP
+
+    RZP --> MODAL
+    MODAL -->|Customer Pays| WH_VERIFY
+
+    WH_VERIFY --> DEDUP
+    DEDUP --> AUDIT
+    AUDIT --> WS
+
+    %% Styling
+    classDef ingest fill:#f8fafc,stroke:#94a3b8,stroke-width:1px,color:#0f172a;
+    classDef ai fill:#eff6ff,stroke:#3b82f6,stroke-width:1px,color:#1e40af;
+    classDef policy fill:#fef3c7,stroke:#f59e0b,stroke-width:1px,color:#92400e;
+    classDef execute fill:#ecfdf5,stroke:#10b981,stroke-width:1px,color:#065f46;
+    classDef stop fill:#fef2f2,stroke:#ef4444,stroke-width:1px,color:#991b1b;
+    classDef ledger fill:#f5f3ff,stroke:#8b5cf6,stroke-width:1px,color:#5b21b6;
+
+    class W1,W2,W3 ingest;
+    class ISO,ACT,LLM,OUT ai;
+    class G1,G2,G3 policy;
+    class RZP,MODAL,SWIPE execute;
+    class STOP stop;
+    class WH_VERIFY,DEDUP,AUDIT,WS ledger;
+```
+
+</div>
+
 ## Tech Stack
 
 <div align="center">
