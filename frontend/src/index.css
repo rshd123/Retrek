@@ -1,3 +1,4 @@
+@import "tailwindcss";
 @import url("https://fonts.googleapis.com/css2?family=Kameron:wght@400..700&display=swap");
 
 :root {
@@ -48,4 +49,12 @@ a {
   max-width: 100%;
   min-height: 100svh;
   overflow-x: hidden;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }

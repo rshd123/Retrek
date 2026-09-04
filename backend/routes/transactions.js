@@ -1,8 +1,6 @@
 import express from "express";
 import { supabase } from "../services/supabaseClient.js";
-import { diagnoseFailure } from "../services/aiService.js";
-import { evaluatePolicy } from "../services/policyEngine.js";
-import { createPaymentLink } from "../services/razorpayService.js";
+import { processTransactionPipeline } from "../services/pipelineService.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -20,102 +18,6 @@ function mapActionToStatus(actionTaken) {
   if (action.includes("HUMAN_APPROVAL") || action.includes("PENDING")) return "PENDING_APPROVAL";
   if (action.includes("STOP")) return "STOPPED";
   return null;
-}
-
-/**
- * Process a single transaction through the full real-time pipeline:
- * AI Diagnosis → Policy Gate → Act → Audit Log
- */
-async function processTransaction(transactionId) {
-  // 1. Fetch transaction from DB
-  const { data: transaction, error: fetchError } = await supabase
-    .from("transactions")
-    .select("*")
-    .eq("id", transactionId)
-    .single();
-
-  if (fetchError || !transaction) {
-    throw new Error(`Transaction ${transactionId} not found: ${fetchError?.message}`);
-  }
-
-  // 2. AI Diagnosis
-  const diagnosis = await diagnoseFailure(transaction);
-
-  // 3. Policy Gate
-  const policy = evaluatePolicy(transaction, diagnosis);
-
-  // 4. Act based on gate decision
-  let actionTaken = policy.gate_decision;
-  let paymentLink = null;
-  let newStatus = transaction.status;
-
-  if (policy.gate_decision === "STOP_RULE") {
-    newStatus = "STOPPED";
-  } else if (policy.gate_decision === "HUMAN_APPROVAL") {
-    newStatus = "PENDING_APPROVAL";
-  } else if (policy.gate_decision === "AUTO_EXECUTE") {
-    try {
-      paymentLink = await createPaymentLink(transaction, diagnosis.customer_message_hinglish);
-      newStatus = "LINK_SENT";
-      actionTaken = "AUTO_EXECUTE_LINK_SENT";
-    } catch (linkError) {
-      console.error(`Payment link failed for ${transactionId}:`, linkError.message);
-      newStatus = "LINK_FAILED";
-      actionTaken = "AUTO_EXECUTE_FAILED";
-    }
-  }
-
-  // 5. Update transaction status in DB
-  const { error: updateError } = await supabase
-    .from("transactions")
-    .update({ status: newStatus })
-    .eq("id", transactionId);
-
-  if (updateError) {
-    console.error(`DB update failed for ${transactionId}:`, updateError.message);
-    throw new Error(`Failed to update transaction status: ${updateError.message}`);
-  }
-
-  // 6. Log to audit_logs
-  const { error: auditError } = await supabase.from("audit_logs").insert({
-    transaction_id: transactionId,
-    decline_code: transaction.decline_code,
-    recovery_probability: diagnosis.recovery_probability,
-    gate_decision: policy.gate_decision,
-    ai_reasoning: {
-      ...diagnosis,
-      policy_reason: policy.reason,
-      action_taken: actionTaken,
-      payment_link_url: paymentLink?.payment_link_url || null,
-    },
-  });
-
-  if (auditError) {
-    console.error(`Audit log insert failed for ${transactionId}:`, auditError.message);
-  }
-
-  console.log(
-    ` ${transactionId} | ${policy.gate_decision} | ₹${transaction.amount} | Prob: ${diagnosis.recovery_probability} | ${policy.reason}`
-  );
-
-  return {
-    transaction_id: transactionId,
-    amount: transaction.amount,
-    decline_code: transaction.decline_code,
-    scenario_type: transaction.scenario_type || "payment_degradation",
-    gate_decision: policy.gate_decision,
-    policy_reason: policy.reason,
-    recovery_probability: diagnosis.recovery_probability,
-    probability_breakdown: diagnosis.probability_breakdown,
-    iso_code: diagnosis.iso_code,
-    root_cause: diagnosis.root_cause,
-    reasoning_summary: diagnosis.reasoning_summary,
-    customer_message_hinglish: diagnosis.customer_message_hinglish,
-    customer_message_english: diagnosis.customer_message_english,
-    action_taken: actionTaken,
-    payment_link_url: paymentLink?.payment_link_url || null,
-    status: newStatus,
-  };
 }
 
 async function clearTableRows(tableName, idCol = "id") {
@@ -269,7 +171,7 @@ router.post("/batch-process", async (req, res) => {
     const results = [];
     for (const tx of failedTransactions) {
       try {
-        const result = await processTransaction(tx.id);
+        const result = await processTransactionPipeline(tx.id, { source: "api/batch" });
         results.push({ id: tx.id, success: true, ...result });
       } catch (err) {
         results.push({ id: tx.id, success: false, error: err.message });
@@ -290,7 +192,7 @@ router.post("/batch-process", async (req, res) => {
 // POST /api/transactions/:id/process — Process a single transaction through the full pipeline
 router.post("/:id/process", async (req, res) => {
   try {
-    const result = await processTransaction(req.params.id);
+    const result = await processTransactionPipeline(req.params.id, { source: "api/single" });
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({

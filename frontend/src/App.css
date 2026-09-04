@@ -1866,3 +1866,26 @@
   animation: chevronPulse 1.4s infinite ease-in-out;
 }
 
+/* ── Scroll-reveal animations ──────────────────────────────── */
+[data-reveal],
+[data-reveal-child] {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 600ms ease-out, transform 600ms ease-out;
+}
+[data-reveal].revealed,
+[data-reveal-child].revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Reduced motion ────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal],
+  [data-reveal-child] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+

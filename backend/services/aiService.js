@@ -157,6 +157,51 @@ const SCENARIO_FALLBACKS = {
 };
 
 /**
+ * Validates LLM JSON response against the required schema.
+ * Returns a sanitized diagnosis object or null if validation fails.
+ */
+function validateLLMDiagnosis(parsed, transaction, ontology, fallbacks) {
+  if (!parsed || typeof parsed !== "object") return null;
+
+  const requiredStringFields = ["root_cause", "customer_message_hinglish", "customer_message_english", "reasoning_summary"];
+  for (const field of requiredStringFields) {
+    if (typeof parsed[field] !== "string" || parsed[field].trim().length === 0) {
+      console.warn(`[AI Validation] Missing or invalid field: ${field}`);
+      return null;
+    }
+  }
+
+  const validActions = ["AUTO_RETRY", "MANUAL_REVIEW", "HARD_STOP_REFUSAL"];
+  if (!validActions.includes(parsed.suggested_action)) {
+    console.warn(`[AI Validation] Invalid suggested_action: ${parsed.suggested_action}`);
+    return null;
+  }
+
+  let prob = Number(parsed.recovery_probability);
+  if (isNaN(prob)) prob = fallbacks.calculatedBaseline;
+  prob = Math.max(0.00, Math.min(1.00, prob));
+
+  return {
+    transaction_id: transaction.id,
+    iso_code: parsed.iso_code || ontology.iso_code,
+    failure_category: parsed.failure_category || ontology.category,
+    root_cause: parsed.root_cause,
+    recovery_probability: Number(prob.toFixed(2)),
+    probability_breakdown: parsed.probability_breakdown || {
+      base_probability: ontology.base_probability,
+      loyalty_boost: fallbacks.loyaltyBoost,
+      retry_penalty: fallbacks.retryPenalty,
+      ticket_adjustment: fallbacks.ticketAdjustment,
+      final_probability: Number(prob.toFixed(2))
+    },
+    suggested_action: parsed.suggested_action,
+    customer_message_hinglish: parsed.customer_message_hinglish,
+    customer_message_english: parsed.customer_message_english,
+    reasoning_summary: parsed.reasoning_summary,
+  };
+}
+
+/**
  * Diagnoses a payment failure using LLM inference with ISO ontology mapping,
  * computing recovery probability, root-cause categorization, and culturally tuned Hinglish messaging.
  */
@@ -285,34 +330,21 @@ Output ONLY valid JSON, no markdown formatting.`;
 
     const parsed = JSON.parse(content);
 
-    // Sanitize and bound recovery_probability
-    let prob = Number(parsed.recovery_probability);
-    if (isNaN(prob)) prob = calculatedBaseline;
-    prob = Math.max(0.00, Math.min(1.00, prob));
+    // Strict schema validation
+    const validated = validateLLMDiagnosis(parsed, transaction, ontology, {
+      calculatedBaseline, loyaltyBoost, retryPenalty, ticketAdjustment
+    });
 
-    const breakdown = parsed.probability_breakdown || {
-      base_probability: ontology.base_probability,
-      loyalty_boost: loyaltyBoost,
-      retry_penalty: retryPenalty,
-      ticket_adjustment: ticketAdjustment,
-      final_probability: Number(prob.toFixed(2))
-    };
+    if (validated) {
+      console.log(`[AI] LLM diagnosis validated for ${transaction.id}: prob=${validated.recovery_probability}, action=${validated.suggested_action}, latency=${latencyMs}ms`);
+      return { ...validated, latency_ms: latencyMs };
+    }
 
-    return {
-      transaction_id: transaction.id,
-      iso_code: parsed.iso_code || ontology.iso_code,
-      failure_category: parsed.failure_category || ontology.category,
-      root_cause: parsed.root_cause || ontology.description,
-      recovery_probability: Number(prob.toFixed(2)),
-      probability_breakdown: breakdown,
-      suggested_action: parsed.suggested_action || (prob >= 0.65 ? "AUTO_RETRY" : prob >= 0.50 ? "MANUAL_REVIEW" : "HARD_STOP_REFUSAL"),
-      customer_message_hinglish: parsed.customer_message_hinglish || SCENARIO_FALLBACKS[scenarioType]?.hinglish(transaction.customer_name || 'there', transaction.amount) || SCENARIO_FALLBACKS.payment_degradation.hinglish(transaction.customer_name || 'there', transaction.amount),
-      customer_message_english: parsed.customer_message_english || SCENARIO_FALLBACKS[scenarioType]?.english(transaction.customer_name || 'Customer', transaction.amount) || SCENARIO_FALLBACKS.payment_degradation.english(transaction.customer_name || 'Customer', transaction.amount),
-      reasoning_summary: parsed.reasoning_summary || `Multi-factor actuarial assessment: Base ${ontology.base_probability} (${ontology.iso_code}) + Loyalty +${loyaltyBoost} (${pastSuccessCount} orders) - Retries -${retryPenalty} + Ticket Adj ${ticketAdjustment} = ${prob.toFixed(2)}.`,
-      latency_ms: latencyMs
-    };
+    // Validation failed — fall through to fallback
+    console.warn(`[AI] LLM response failed schema validation for ${transaction.id}, using fallback`);
+    throw new Error("LLM response failed schema validation");
   } catch (error) {
-    console.error(`AI diagnosis exception for ${transaction.id}:`, error.message);
+    console.error(`[AI] Diagnosis exception for ${transaction.id}: ${error.message}`);
     // Safe Multi-Factor Fallback
     return {
       transaction_id: transaction.id,
