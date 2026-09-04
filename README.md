@@ -101,6 +101,7 @@ flowchart TD
     class STOP stop;
     class WH_VERIFY,DEDUP,AUDIT,WS ledger;
 ```
+</div>
 
 ## Tech Stack
 
