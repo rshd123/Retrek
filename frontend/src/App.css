@@ -788,6 +788,11 @@
   to { transform: rotate(360deg); }
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
 /* Mobile Menu Toggle (hidden on desktop) */
 .mobile-menu-toggle {
   display: none;
@@ -1826,3 +1831,38 @@
   border-bottom-left-radius: 14px;
   border-bottom-right-radius: 14px;
 }
+
+/* Swipe to Approve Animations */
+@keyframes swipeShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes chevronPulse {
+  0%, 100% {
+    transform: translateX(0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateX(5px);
+    opacity: 1;
+  }
+}
+
+.swipe-shimmer-label {
+  background: linear-gradient(90deg, #94a3b8 0%, #cbd5e1 35%, #ffffff 50%, #cbd5e1 65%, #94a3b8 100%);
+  background-size: 200% auto;
+  color: transparent !important;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: swipeShimmer 2.5s infinite linear;
+}
+
+.swipe-chevron-pulse {
+  animation: chevronPulse 1.4s infinite ease-in-out;
+}
+

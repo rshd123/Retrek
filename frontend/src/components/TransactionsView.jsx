@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { api } from '../services/api';
 import ScenarioBadge from './ScenarioBadge';
+import SwipeToApprove from './SwipeToApprove';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const BACKEND_BASE = API_BASE.replace(/\/api\/?$/, '');
@@ -433,7 +434,7 @@ export default function TransactionsView({
                           >
                             Resolve
                           </button>
-                        ) : (tx.status === 'FAILED' || tx.status === 'STOPPED') ? (
+                        ) : tx.status === 'FAILED' ? (
                           <button
                             className="btn btn-sm btn-primary"
                             onClick={() => handleProcess(tx.id)}
@@ -648,7 +649,7 @@ export default function TransactionsView({
             </div>
 
             <div className="modal-footer" style={{ borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-              {(selectedTx.status === 'FAILED' || selectedTx.status === 'STOPPED') && (
+              {selectedTx.status === 'FAILED' && (
                 <button
                   className="btn btn-primary"
                   onClick={() => handleProcess(selectedTx.id)}
@@ -658,26 +659,23 @@ export default function TransactionsView({
                 </button>
               )}
               {selectedTx.status === 'PENDING_APPROVAL' && (
-                <>
-                  <button
-                    className="btn btn-success"
-                    onClick={() => handleApprove(selectedTx.id)}
+                <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                  <SwipeToApprove
+                    onApprove={() => handleApprove(selectedTx.id)}
                     disabled={processingId === selectedTx.id}
-                  >
-                    Approve Recovery Link
-                  </button>
+                    label="Slide to Approve Recovery"
+                    approvedLabel="Link Approved ✓"
+                  />
                   <button
-                    className="btn btn-danger"
+                    className="btn btn-danger btn-sm"
                     onClick={() => handleDecline(selectedTx.id)}
                     disabled={processingId === selectedTx.id}
+                    style={{ padding: '10px 20px', fontSize: '13px' }}
                   >
-                    Decline & Stop
+                    Decline
                   </button>
-                </>
+                </div>
               )}
-              <button className="btn btn-outline" onClick={() => setSelectedTx(null)}>
-                Close
-              </button>
             </div>
           </div>
         </div>
