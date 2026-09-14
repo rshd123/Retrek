@@ -26,6 +26,7 @@ export default function TransactionsView({
   const [processingId, setProcessingId] = useState(null);
   const [batchProcessing, setBatchProcessing] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  const [txErrors, setTxErrors] = useState({});
 
   // Compute summary stats
   const stats = useMemo(() => {
@@ -95,6 +96,7 @@ export default function TransactionsView({
 
   const handleProcess = async (id) => {
     setProcessingId(id);
+    setTxErrors((prev) => { const next = { ...prev }; delete next[id]; return next; });
     try {
       const res = await api.processTransaction(id);
       const data = res.data || {};
@@ -110,7 +112,9 @@ export default function TransactionsView({
         return { ...prev, ...data, id };
       });
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Processing failed' });
+      const msg = err.message || 'Processing failed';
+      setTxErrors((prev) => ({ ...prev, [id]: msg }));
+      setMessage({ type: 'error', text: msg });
     } finally {
       setProcessingId(null);
     }
@@ -118,12 +122,26 @@ export default function TransactionsView({
 
   const handleBatchProcess = async () => {
     setBatchProcessing(true);
+    setTxErrors({});
     try {
       const res = await api.batchProcessTransactions();
-      setMessage({
-        type: 'success',
-        text: res.message || `Processed ${res.processed_count || 0} failed transactions through AI pipeline!`
-      });
+      const failedResults = (res.results || []).filter((r) => !r.success);
+      if (failedResults.length > 0) {
+        const errors = {};
+        for (const r of failedResults) {
+          errors[r.id] = r.error || 'AI diagnosis failed';
+        }
+        setTxErrors(errors);
+        setMessage({
+          type: 'error',
+          text: `${failedResults.length}/${res.results.length} transactions failed — AI API error. Check individual cards for details.`
+        });
+      } else {
+        setMessage({
+          type: 'success',
+          text: res.message || `Processed ${res.processed_count || 0} failed transactions through AI pipeline!`
+        });
+      }
       if (onRefresh) onRefresh();
     } catch (err) {
       setMessage({ type: 'error', text: err.message || 'Batch processing failed' });
@@ -376,6 +394,11 @@ export default function TransactionsView({
                       <span className={`status-pill status-${(tx.status || 'unknown').toLowerCase()}`}>
                         {(tx.status || 'unknown').replace(/_/g, ' ')}
                       </span>
+                      {txErrors[tx.id] && (
+                        <span className="status-pill" style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', marginTop: '4px', display: 'inline-block' }} title={txErrors[tx.id]}>
+                          API Error
+                        </span>
+                      )}
                     </td>
                     <td data-label="Customer">
                       {tx.customer_name ? (
@@ -510,6 +533,26 @@ export default function TransactionsView({
                   </span>
                 </div>
               </div>
+
+              {/* API Error Block */}
+              {txErrors[selectedTx.id] && (
+                <div className="modal-section-box" style={{ background: '#fef2f2', borderLeft: '4px solid #ef4444', marginTop: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <span style={{ color: '#dc2626', fontWeight: '700', fontSize: '13px' }}>AI API Error</span>
+                  </div>
+                  <p style={{ margin: '0', fontSize: '13px', color: '#991b1b', fontFamily: 'monospace', wordBreak: 'break-word' }}>
+                    {txErrors[selectedTx.id]}
+                  </p>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: '#b91c1c' }}>
+                    The Groq LLM was not reached. No fallback used. Fix the API key or model config and retry.
+                  </p>
+                </div>
+              )}
 
               {/* 1. Cognitive AI Diagnosis Block */}
               <div className="modal-section-box" style={{ background: '#f8fafc', borderLeft: '4px solid #3b82f6', marginTop: '16px' }}>

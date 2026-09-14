@@ -124,38 +124,6 @@ const SCENARIO_CONTEXT = {
   ptp_commitment: "This is a PROMISE-TO-PAY case: the customer previously committed to paying on a specific date. Reference their prior commitment politely and provide the payment link."
 };
 
-// Scenario-specific fallback messages
-const SCENARIO_FALLBACKS = {
-  checkout_dropoff: {
-    hinglish: (name, amt) => `Hi ${name}, aapka checkout adhura reh gaya hai (₹${amt}). Niche diye link se ek click mein payment complete karein!`,
-    english: (name, amt) => `Hello ${name}, your checkout for ₹${amt} is incomplete. Complete your purchase now with the secure link below.`
-  },
-  subscription_failure: {
-    hinglish: (name, amt) => `Hi ${name}, aapka ₹${amt} ka subscription payment fail ho gaya hai. Link se retry karein taaki aapki service na ruke.`,
-    english: (name, amt) => `Hello ${name}, your subscription payment of ₹${amt} failed. Please retry now to avoid service interruption.`
-  },
-  b2b_receivables: {
-    hinglish: (name, amt) => `Dear ${name}, this is a reminder for your overdue invoice settlement of ₹${amt}. Please process the payment at your earliest convenience using the link below.`,
-    english: (name, amt) => `Dear ${name}, your invoice of ₹${amt} is overdue. Please settle the outstanding amount using the payment link below.`
-  },
-  mandate_retry: {
-    hinglish: (name, amt) => `Hi ${name}, aapka e-mandate payment (₹${amt}) bank side se fail hua hai. Niche diye link se retry karein ya next retry ka wait karein.`,
-    english: (name, amt) => `Hello ${name}, your e-mandate payment of ₹${amt} failed at the bank. Please retry using the link or wait for the next scheduled attempt.`
-  },
-  voice_recovery: {
-    hinglish: (name, amt) => `Namaste ${name}, hum Retrek se bol rahe hain. Aapka ₹${amt} ka payment nahi ho paya. Kya aap abhi link se payment kar sakte hain?`,
-    english: (name, amt) => `Hello ${name}, this is Retrek calling about your failed payment of ₹${amt}. Would you like to complete the payment now using the link we'll send you?`
-  },
-  ptp_commitment: {
-    hinglish: (name, amt) => `Hi ${name}, aapne kal payment karne ka promise kiya tha (₹${amt}). Aaj ka din aa gaya hai — link se complete karein.`,
-    english: (name, amt) => `Hello ${name}, as per your promise-to-pay commitment, your payment of ₹${amt} is now due. Please complete it using the link below.`
-  },
-  payment_degradation: {
-    hinglish: (name, amt) => `Hi ${name}, aapka ₹${amt} ka payment complete nahi ho paya. Niche diye link se retry karein.`,
-    english: (name, amt) => `Hello ${name}, your payment of ₹${amt} was unsuccessful. Please use the link below to complete your checkout.`
-  }
-};
-
 /**
  * Validates LLM JSON response against the required schema.
  * Returns a sanitized diagnosis object or null if validation fails.
@@ -204,6 +172,8 @@ function validateLLMDiagnosis(parsed, transaction, ontology, fallbacks) {
 /**
  * Diagnoses a payment failure using LLM inference with ISO ontology mapping,
  * computing recovery probability, root-cause categorization, and culturally tuned Hinglish messaging.
+ *
+ * NO FALLBACKS — throws on any API or validation error.
  */
 export async function diagnoseFailure(transaction) {
   const declineKey = String(transaction.decline_code || "").toUpperCase().trim();
@@ -230,8 +200,13 @@ export async function diagnoseFailure(transaction) {
       suggested_action: "HARD_STOP_REFUSAL",
       customer_message_hinglish: "",
       customer_message_english: "",
-      reasoning_summary: "Deterministic safety invariant triggered: 0% recovery viability to prevent chargebacks and fraud."
+      reasoning_summary: "Deterministic safety invariant triggered: 0% recovery viability to prevent chargebacks and fraud.",
+      ai_source: "deterministic_invariant"
     };
+  }
+
+  if (!process.env.LLM_API_KEY) {
+    throw new Error("[AI] LLM_API_KEY is not set in environment. Cannot run AI diagnosis.");
   }
 
   // LLM Prompt Construction
@@ -291,79 +266,61 @@ Required JSON Output Schema:
 
 Output ONLY valid JSON, no markdown formatting.`;
 
-  try {
-    const startTime = Date.now();
-    const response = await groq.chat.completions.create({
-      model: process.env.MODEL_NAME || "qwen/qwen3.6-27b",
-      messages: [
-        {
-          role: "system",
-          content: "You are Retrek AI, an expert payment failure diagnosis engine. Output ONLY a valid JSON object matching the requested schema."
-        },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.2,
-      max_tokens: 1500,
-      response_format: { type: "json_object" },
-    });
-
-    const latencyMs = Date.now() - startTime;
-    let content = response.choices[0]?.message?.content?.trim() || "{}";
-    
-    // Strip <think>...</think> tags or unclosed <think> blocks emitted by reasoning models
-    content = content.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trim();
-
-    // Clean potential markdown code fences
-    if (content.includes("```")) {
-      const match = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      if (match) {
-        content = match[1].trim();
-      }
-    }
-
-    // Extract the JSON object substring between { and }
-    const firstBrace = content.indexOf("{");
-    const lastBrace = content.lastIndexOf("}");
-    if (firstBrace !== -1 && lastBrace !== -1) {
-      content = content.substring(firstBrace, lastBrace + 1);
-    }
-
-    const parsed = JSON.parse(content);
-
-    // Strict schema validation
-    const validated = validateLLMDiagnosis(parsed, transaction, ontology, {
-      calculatedBaseline, loyaltyBoost, retryPenalty, ticketAdjustment
-    });
-
-    if (validated) {
-      console.log(`[AI] LLM diagnosis validated for ${transaction.id}: prob=${validated.recovery_probability}, action=${validated.suggested_action}, latency=${latencyMs}ms`);
-      return { ...validated, latency_ms: latencyMs };
-    }
-
-    // Validation failed — fall through to fallback
-    console.warn(`[AI] LLM response failed schema validation for ${transaction.id}, using fallback`);
-    throw new Error("LLM response failed schema validation");
-  } catch (error) {
-    console.error(`[AI] Diagnosis exception for ${transaction.id}: ${error.message}`);
-    // Safe Multi-Factor Fallback
-    return {
-      transaction_id: transaction.id,
-      iso_code: ontology.iso_code,
-      failure_category: ontology.category,
-      root_cause: ontology.description,
-      recovery_probability: calculatedBaseline,
-      probability_breakdown: {
-        base_probability: ontology.base_probability,
-        loyalty_boost: loyaltyBoost,
-        retry_penalty: retryPenalty,
-        ticket_adjustment: ticketAdjustment,
-        final_probability: calculatedBaseline
+  const startTime = Date.now();
+  const response = await groq.chat.completions.create({
+    model: process.env.MODEL_NAME || "openai/gpt-oss-20b",
+    messages: [
+      {
+        role: "system",
+        content: "You are Retrek AI, an expert payment failure diagnosis engine. Output ONLY a valid JSON object matching the requested schema."
       },
-      suggested_action: calculatedBaseline >= 0.65 ? "AUTO_RETRY" : calculatedBaseline >= 0.50 ? "MANUAL_REVIEW" : "HARD_STOP_REFUSAL",
-      customer_message_hinglish: SCENARIO_FALLBACKS[scenarioType]?.hinglish(transaction.customer_name || 'there', transaction.amount) || SCENARIO_FALLBACKS.payment_degradation.hinglish(transaction.customer_name || 'there', transaction.amount),
-      customer_message_english: SCENARIO_FALLBACKS[scenarioType]?.english(transaction.customer_name || 'Customer', transaction.amount) || SCENARIO_FALLBACKS.payment_degradation.english(transaction.customer_name || 'Customer', transaction.amount),
-      reasoning_summary: `Multi-factor actuarial assessment: Base ${ontology.base_probability} (${ontology.iso_code}) + Loyalty +${loyaltyBoost} (${pastSuccessCount} orders) - Retries -${retryPenalty} + Ticket Adj ${ticketAdjustment} = ${calculatedBaseline}.`,
-      latency_ms: 0
-    };
+      { role: "user", content: prompt }
+    ],
+    temperature: 0.2,
+    max_tokens: 2000,
+  });
+
+  const latencyMs = Date.now() - startTime;
+  let content = response.choices[0]?.message?.content?.trim() || "";
+
+  if (!content) {
+    throw new Error("[AI] LLM returned empty response. API may be down or model returned no content.");
   }
+
+  // Strip <think>...</think> tags or unclosed <think> blocks emitted by reasoning models
+  content = content.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trim();
+
+  // Clean potential markdown code fences
+  if (content.includes("```")) {
+    const match = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (match) {
+      content = match[1].trim();
+    }
+  }
+
+  // Extract the JSON object substring between { and }
+  const firstBrace = content.indexOf("{");
+  const lastBrace = content.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1) {
+    content = content.substring(firstBrace, lastBrace + 1);
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch (parseErr) {
+    throw new Error(`[AI] Failed to parse LLM JSON response: ${parseErr.message}. Raw content: ${content.substring(0, 200)}`);
+  }
+
+  // Strict schema validation
+  const validated = validateLLMDiagnosis(parsed, transaction, ontology, {
+    calculatedBaseline, loyaltyBoost, retryPenalty, ticketAdjustment
+  });
+
+  if (!validated) {
+    throw new Error(`[AI] LLM response failed schema validation for ${transaction.id}. Parsed: ${JSON.stringify(parsed).substring(0, 300)}`);
+  }
+
+  console.log(`[AI] LLM diagnosis validated for ${transaction.id}: prob=${validated.recovery_probability}, action=${validated.suggested_action}, latency=${latencyMs}ms`);
+  return { ...validated, latency_ms: latencyMs, ai_source: "llm" };
 }

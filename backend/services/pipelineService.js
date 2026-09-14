@@ -43,8 +43,14 @@ export async function processTransactionPipeline(transactionId, options = {}) {
     transaction = { ...transaction, retry_count: retryCountOverride };
   }
 
-  // 2. AI Diagnosis (Groq LLM + ISO ontology)
-  const diagnosis = await diagnoseFailure(transaction);
+  // 2. AI Diagnosis (Groq LLM + ISO ontology) — no fallback, throws on failure
+  let diagnosis;
+  try {
+    diagnosis = await diagnoseFailure(transaction);
+  } catch (aiErr) {
+    console.error(`[Pipeline] AI diagnosis FAILED for ${transactionId}: ${aiErr.message}`);
+    throw new Error(`AI diagnosis failed: ${aiErr.message}`);
+  }
 
   // 3. Deterministic Policy Gate (no LLM calls)
   const policy = evaluatePolicy(transaction, diagnosis);

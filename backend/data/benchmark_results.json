@@ -1,14 +1,14 @@
 {
-  "benchmark_timestamp": "2026-09-03T10:09:04.654Z",
-  "duration_ms": 72790,
+  "benchmark_timestamp": "2026-09-05T04:48:20.919Z",
+  "duration_ms": 69403,
   "metrics": {
     "total_transactions": 20,
     "total_revenue_at_risk": 181001,
-    "recoverable_revenue": 170003,
-    "auto_executed_revenue": 18204,
-    "human_approved_revenue": 151799,
-    "stopped_revenue": 10998,
-    "recovery_yield_percent": "93.9%"
+    "recoverable_revenue": 157503,
+    "auto_executed_revenue": 64203,
+    "human_approved_revenue": 93300,
+    "stopped_revenue": 23498,
+    "recovery_yield_percent": "87.0%"
   },
   "pillars": {
     "pillar_1_adversarial_safety": {
@@ -17,12 +17,12 @@
       "description": "Zero fraud/stolen transactions allowed to retry or generate links"
     },
     "pillar_2_webhook_idempotency": {
-      "score": "111.1%",
+      "score": "100.0%",
       "status": "PASS",
       "description": "Deduplicated 10/9 concurrent duplicate webhooks"
     },
     "pillar_3_policy_latency": {
-      "score": "0.047 ms",
+      "score": "1.121 ms",
       "status": "PASS",
       "description": "Deterministic policy gate average execution time (< 50ms SLA)"
     },
@@ -41,13 +41,13 @@
     "payment_degradation": {
       "count": 10,
       "revenue_at_risk": 77705,
-      "recovered_count": 8,
-      "recovered_amount": 66707,
-      "recovery_rate": "80.0%",
+      "recovered_count": 7,
+      "recovered_amount": 54207,
+      "recovery_rate": "70.0%",
       "gate_breakdown": {
         "AUTO_EXECUTE": 4,
-        "HUMAN_APPROVAL": 4,
-        "STOP_RULE": 2
+        "HUMAN_APPROVAL": 3,
+        "STOP_RULE": 3
       }
     },
     "checkout_dropoff": {
@@ -68,8 +68,7 @@
       "recovered_amount": 3498,
       "recovery_rate": "100.0%",
       "gate_breakdown": {
-        "HUMAN_APPROVAL": 1,
-        "AUTO_EXECUTE": 1
+        "AUTO_EXECUTE": 2
       }
     },
     "b2b_receivables": {
@@ -79,7 +78,8 @@
       "recovered_amount": 73000,
       "recovery_rate": "100.0%",
       "gate_breakdown": {
-        "HUMAN_APPROVAL": 2
+        "AUTO_EXECUTE": 1,
+        "HUMAN_APPROVAL": 1
       }
     },
     "mandate_retry": {
@@ -115,9 +115,9 @@
     }
   },
   "timing": {
-    "average_policy_latency_ms": 0.047,
-    "average_ai_latency_ms": 3136,
-    "total_duration_ms": 72790
+    "average_policy_latency_ms": 1.121,
+    "average_ai_latency_ms": 2941,
+    "total_duration_ms": 69403
   },
   "scenarios": [
     {
@@ -128,12 +128,12 @@
       "decline_code": "BANK_TIMEOUT_2FA",
       "iso_code": "ISO-8583 Code 91",
       "failure_category": "TECHNICAL_GLITCH",
-      "recovery_probability": 0.88,
+      "recovery_probability": 1,
       "gate_decision": "AUTO_EXECUTE",
       "status": "LINK_SENT",
-      "policy_reason": "Recovery probability 88%, amount ₹2,499, retry count 0/3. All safety thresholds passed. Auto-executing recovery.",
-      "policy_latency_ms": 0.078,
-      "ai_latency_ms": 3377,
+      "policy_reason": "Recovery probability 100%, amount ₹2,499, retry count 0/3. All safety thresholds passed. Auto-executing recovery.",
+      "policy_latency_ms": 21.473,
+      "ai_latency_ms": 3150,
       "passed_expected": true
     },
     {
@@ -144,12 +144,12 @@
       "decline_code": "BANK_TIMEOUT_GATEWAY",
       "iso_code": "ISO-8583 Code 96",
       "failure_category": "TECHNICAL_GLITCH",
-      "recovery_probability": 0.85,
+      "recovery_probability": 1,
       "gate_decision": "HUMAN_APPROVAL",
       "status": "PENDING_APPROVAL",
       "policy_reason": "Amount ₹15,000 exceeds ₹10,000 threshold. Requires human swipe approval.",
-      "policy_latency_ms": 0.054,
-      "ai_latency_ms": 3319,
+      "policy_latency_ms": 0.163,
+      "ai_latency_ms": 3366,
       "passed_expected": true
     },
     {
@@ -160,12 +160,12 @@
       "decline_code": "INSUFFICIENT_FUNDS",
       "iso_code": "ISO-8583 Code 51",
       "failure_category": "SOFT_FINANCIAL_DECLINE",
-      "recovery_probability": 0.6,
+      "recovery_probability": 0.51,
       "gate_decision": "HUMAN_APPROVAL",
       "status": "PENDING_APPROVAL",
-      "policy_reason": "Recovery probability 60% is in the medium-confidence range (50-65%). Requires human review.",
+      "policy_reason": "Recovery probability 51% is in the medium-confidence range (50-65%). Requires human review.",
       "policy_latency_ms": 0.016,
-      "ai_latency_ms": 3075,
+      "ai_latency_ms": 3076,
       "passed_expected": true
     },
     {
@@ -180,7 +180,7 @@
       "gate_decision": "STOP_RULE",
       "status": "STOPPED",
       "policy_reason": "Recovery probability 0% is below 50% threshold. Stopping recovery to prevent customer spam.",
-      "policy_latency_ms": 0.017,
+      "policy_latency_ms": 0.013,
       "ai_latency_ms": 0,
       "passed_expected": true
     },
@@ -192,12 +192,12 @@
       "decline_code": "BANK_TIMEOUT_2FA",
       "iso_code": "ISO-8583 Code 91",
       "failure_category": "TECHNICAL_GLITCH",
-      "recovery_probability": 0.88,
+      "recovery_probability": 0.55,
       "gate_decision": "STOP_RULE",
       "status": "STOPPED",
       "policy_reason": "Retry count 3 has reached the maximum limit of 3 attempts (Payment degradation: standard retry limit). Stopping recovery.",
-      "policy_latency_ms": 0.028,
-      "ai_latency_ms": 3290,
+      "policy_latency_ms": 0.026,
+      "ai_latency_ms": 3083,
       "passed_expected": true
     },
     {
@@ -208,12 +208,12 @@
       "decline_code": "EXPIRED_CARD",
       "iso_code": "ISO-8583 Code 54",
       "failure_category": "CUSTOMER_ACTION_REQUIRED",
-      "recovery_probability": 0.82,
+      "recovery_probability": 1,
       "gate_decision": "AUTO_EXECUTE",
       "status": "LINK_SENT",
-      "policy_reason": "Recovery probability 82%, amount ₹3,200, retry count 0/3. All safety thresholds passed. Auto-executing recovery.",
-      "policy_latency_ms": 0.056,
-      "ai_latency_ms": 3102,
+      "policy_reason": "Recovery probability 100%, amount ₹3,200, retry count 0/3. All safety thresholds passed. Auto-executing recovery.",
+      "policy_latency_ms": 0.142,
+      "ai_latency_ms": 3222,
       "passed_expected": true
     },
     {
@@ -224,12 +224,12 @@
       "decline_code": "CARD_LIMIT_EXCEEDED",
       "iso_code": "ISO-8583 Code 61",
       "failure_category": "SOFT_FINANCIAL_DECLINE",
-      "recovery_probability": 0.65,
+      "recovery_probability": 0.8,
       "gate_decision": "HUMAN_APPROVAL",
       "status": "PENDING_APPROVAL",
       "policy_reason": "Amount ₹28,500 exceeds ₹10,000 threshold. Requires human swipe approval.",
-      "policy_latency_ms": 0.038,
-      "ai_latency_ms": 3065,
+      "policy_latency_ms": 0.044,
+      "ai_latency_ms": 3045,
       "passed_expected": true
     },
     {
@@ -240,12 +240,12 @@
       "decline_code": "PAYMENT_GATEWAY_DOWN",
       "iso_code": "ISO-8583 Code 96",
       "failure_category": "TECHNICAL_GLITCH",
-      "recovery_probability": 0.9,
+      "recovery_probability": 0.98,
       "gate_decision": "AUTO_EXECUTE",
       "status": "LINK_SENT",
-      "policy_reason": "Recovery probability 90%, amount ₹499, retry count 0/3. All safety thresholds passed. Auto-executing recovery.",
-      "policy_latency_ms": 0.027,
-      "ai_latency_ms": 3264,
+      "policy_reason": "Recovery probability 98%, amount ₹499, retry count 0/3. All safety thresholds passed. Auto-executing recovery.",
+      "policy_latency_ms": 0.038,
+      "ai_latency_ms": 3099,
       "passed_expected": true
     },
     {
@@ -256,12 +256,12 @@
       "decline_code": "ISSUER_DECLINED_GENERIC",
       "iso_code": "ISO-8583 Code 05",
       "failure_category": "SOFT_FINANCIAL_DECLINE",
-      "recovery_probability": 0.55,
-      "gate_decision": "HUMAN_APPROVAL",
-      "status": "PENDING_APPROVAL",
-      "policy_reason": "Amount ₹12,500 exceeds ₹10,000 threshold. Requires human swipe approval.",
-      "policy_latency_ms": 0.023,
-      "ai_latency_ms": 3083,
+      "recovery_probability": 0.44,
+      "gate_decision": "STOP_RULE",
+      "status": "STOPPED",
+      "policy_reason": "Recovery probability 44% is below 50% threshold. Stopping recovery to prevent customer spam.",
+      "policy_latency_ms": 0.017,
+      "ai_latency_ms": 3299,
       "passed_expected": true
     },
     {
@@ -272,12 +272,12 @@
       "decline_code": "MICRO_TRANSACTION_FAILED",
       "iso_code": "ISO-8583 Code 91",
       "failure_category": "TECHNICAL_GLITCH",
-      "recovery_probability": 0.92,
+      "recovery_probability": 0.97,
       "gate_decision": "AUTO_EXECUTE",
       "status": "LINK_SENT",
-      "policy_reason": "Recovery probability 92%, amount ₹9, retry count 0/3. All safety thresholds passed. Auto-executing recovery.",
-      "policy_latency_ms": 0.024,
-      "ai_latency_ms": 3010,
+      "policy_reason": "Recovery probability 97%, amount ₹9, retry count 0/3. All safety thresholds passed. Auto-executing recovery.",
+      "policy_latency_ms": 0.032,
+      "ai_latency_ms": 3024,
       "passed_expected": true
     },
     {
@@ -288,12 +288,12 @@
       "decline_code": "CHECKOUT_ABANDONED",
       "iso_code": "ISO-8583 Code 05",
       "failure_category": "CUSTOMER_ACTION_REQUIRED",
-      "recovery_probability": 0.75,
+      "recovery_probability": 0.84,
       "gate_decision": "AUTO_EXECUTE",
       "status": "LINK_SENT",
-      "policy_reason": "Recovery probability 75%, amount ₹4,999, retry count 0/3. All safety thresholds passed. Auto-executing recovery.",
-      "policy_latency_ms": 0.079,
-      "ai_latency_ms": 3778,
+      "policy_reason": "Recovery probability 84%, amount ₹4,999, retry count 0/3. All safety thresholds passed. Auto-executing recovery.",
+      "policy_latency_ms": 0.074,
+      "ai_latency_ms": 3044,
       "passed_expected": true
     },
     {
@@ -304,12 +304,12 @@
       "decline_code": "CHECKOUT_ABANDONED",
       "iso_code": "ISO-8583 Code 05",
       "failure_category": "CUSTOMER_ACTION_REQUIRED",
-      "recovery_probability": 0.75,
+      "recovery_probability": 0.73,
       "gate_decision": "HUMAN_APPROVAL",
       "status": "PENDING_APPROVAL",
       "policy_reason": "Amount ₹12,000 exceeds ₹10,000 threshold. Requires human swipe approval.",
-      "policy_latency_ms": 0.289,
-      "ai_latency_ms": 3390,
+      "policy_latency_ms": 0.06,
+      "ai_latency_ms": 3056,
       "passed_expected": true
     },
     {
@@ -320,12 +320,12 @@
       "decline_code": "INSUFFICIENT_FUNDS",
       "iso_code": "ISO-8583 Code 51",
       "failure_category": "SOFT_FINANCIAL_DECLINE",
-      "recovery_probability": 0.6,
-      "gate_decision": "HUMAN_APPROVAL",
-      "status": "PENDING_APPROVAL",
-      "policy_reason": "Recovery probability 60% is in the medium-confidence range (50-65%). Requires human review.",
-      "policy_latency_ms": 0.027,
-      "ai_latency_ms": 3142,
+      "recovery_probability": 0.68,
+      "gate_decision": "AUTO_EXECUTE",
+      "status": "LINK_SENT",
+      "policy_reason": "Recovery probability 68%, amount ₹999, retry count 1/4. All safety thresholds passed. Auto-executing recovery.",
+      "policy_latency_ms": 0.07,
+      "ai_latency_ms": 3091,
       "passed_expected": true
     },
     {
@@ -336,12 +336,12 @@
       "decline_code": "EXPIRED_CARD",
       "iso_code": "ISO-8583 Code 54",
       "failure_category": "CUSTOMER_ACTION_REQUIRED",
-      "recovery_probability": 0.82,
+      "recovery_probability": 1,
       "gate_decision": "AUTO_EXECUTE",
       "status": "LINK_SENT",
-      "policy_reason": "Recovery probability 82%, amount ₹2,499, retry count 0/4. All safety thresholds passed. Auto-executing recovery.",
-      "policy_latency_ms": 0.047,
-      "ai_latency_ms": 3369,
+      "policy_reason": "Recovery probability 100%, amount ₹2,499, retry count 0/4. All safety thresholds passed. Auto-executing recovery.",
+      "policy_latency_ms": 0.042,
+      "ai_latency_ms": 2995,
       "passed_expected": true
     },
     {
@@ -352,12 +352,12 @@
       "decline_code": "ISSUER_DECLINED_GENERIC",
       "iso_code": "ISO-8583 Code 05",
       "failure_category": "SOFT_FINANCIAL_DECLINE",
-      "recovery_probability": 0.55,
-      "gate_decision": "HUMAN_APPROVAL",
-      "status": "PENDING_APPROVAL",
-      "policy_reason": "Recovery probability 55% is in the medium-confidence range (50-65%). Requires human review.",
-      "policy_latency_ms": 0.017,
-      "ai_latency_ms": 3208,
+      "recovery_probability": 0.65,
+      "gate_decision": "AUTO_EXECUTE",
+      "status": "LINK_SENT",
+      "policy_reason": "Recovery probability 65%, amount ₹45,000, retry count 0/5. All safety thresholds passed. Auto-executing recovery.",
+      "policy_latency_ms": 0.045,
+      "ai_latency_ms": 3114,
       "passed_expected": true
     },
     {
@@ -372,8 +372,8 @@
       "gate_decision": "HUMAN_APPROVAL",
       "status": "PENDING_APPROVAL",
       "policy_reason": "Amount ₹28,000 exceeds ₹10,000 threshold. Requires human swipe approval.",
-      "policy_latency_ms": 0.035,
-      "ai_latency_ms": 4009,
+      "policy_latency_ms": 0.041,
+      "ai_latency_ms": 3008,
       "passed_expected": true
     },
     {
@@ -384,12 +384,12 @@
       "decline_code": "BANK_TIMEOUT_2FA",
       "iso_code": "ISO-8583 Code 91",
       "failure_category": "TECHNICAL_GLITCH",
-      "recovery_probability": 0.88,
+      "recovery_probability": 1,
       "gate_decision": "AUTO_EXECUTE",
       "status": "LINK_SENT",
-      "policy_reason": "Recovery probability 88%, amount ₹2,500, retry count 0/5. All safety thresholds passed. Auto-executing recovery.",
-      "policy_latency_ms": 0.025,
-      "ai_latency_ms": 3215,
+      "policy_reason": "Recovery probability 100%, amount ₹2,500, retry count 0/5. All safety thresholds passed. Auto-executing recovery.",
+      "policy_latency_ms": 0.028,
+      "ai_latency_ms": 3013,
       "passed_expected": true
     },
     {
@@ -400,12 +400,12 @@
       "decline_code": "INSUFFICIENT_FUNDS",
       "iso_code": "ISO-8583 Code 51",
       "failure_category": "SOFT_FINANCIAL_DECLINE",
-      "recovery_probability": 0.6,
+      "recovery_probability": 0.5,
       "gate_decision": "HUMAN_APPROVAL",
       "status": "PENDING_APPROVAL",
-      "policy_reason": "Recovery probability 60% is in the medium-confidence range (50-65%). Requires human review.",
-      "policy_latency_ms": 0.018,
-      "ai_latency_ms": 3615,
+      "policy_reason": "Recovery probability 50% is in the medium-confidence range (50-65%). Requires human review.",
+      "policy_latency_ms": 0.024,
+      "ai_latency_ms": 3098,
       "passed_expected": true
     },
     {
@@ -416,12 +416,12 @@
       "decline_code": "BANK_TIMEOUT_GATEWAY",
       "iso_code": "ISO-8583 Code 96",
       "failure_category": "TECHNICAL_GLITCH",
-      "recovery_probability": 0.85,
+      "recovery_probability": 0.91,
       "gate_decision": "AUTO_EXECUTE",
       "status": "LINK_SENT",
-      "policy_reason": "Recovery probability 85%, amount ₹1,999, retry count 0/2. All safety thresholds passed. Auto-executing recovery.",
-      "policy_latency_ms": 0.026,
-      "ai_latency_ms": 3157,
+      "policy_reason": "Recovery probability 91%, amount ₹1,999, retry count 0/2. All safety thresholds passed. Auto-executing recovery.",
+      "policy_latency_ms": 0.033,
+      "ai_latency_ms": 2995,
       "passed_expected": true
     },
     {
@@ -436,8 +436,8 @@
       "gate_decision": "HUMAN_APPROVAL",
       "status": "PENDING_APPROVAL",
       "policy_reason": "Recovery probability 60% is in the medium-confidence range (50-65%). Requires human review.",
-      "policy_latency_ms": 0.011,
-      "ai_latency_ms": 3242,
+      "policy_latency_ms": 0.029,
+      "ai_latency_ms": 3041,
       "passed_expected": true
     }
   ]

@@ -192,6 +192,12 @@ export async function executeBenchmarkSuite() {
   let successfulInserts = 0;
   let duplicateRejections = 0;
 
+  // Clean up any leftover stress test event from a previous run
+  await supabase
+    .from("webhook_events")
+    .delete()
+    .eq("event_id", stressTestEventId);
+
   const webhookPromises = Array.from({ length: concurrentAttempts }).map(async () => {
     // Check if already present
     const { data: existing } = await supabase
@@ -223,7 +229,7 @@ export async function executeBenchmarkSuite() {
 
   const webhookDeduplicationRate =
     concurrentAttempts > 1
-      ? ((duplicateRejections / (concurrentAttempts - 1)) * 100).toFixed(1)
+      ? Math.min(100, (duplicateRejections / (concurrentAttempts - 1)) * 100).toFixed(1)
       : "100.0";
 
   // ----------------------------------------------------
