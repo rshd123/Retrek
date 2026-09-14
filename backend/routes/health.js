@@ -80,7 +80,9 @@ router.get("/health", async (req, res) => {
   const isHealthy = services.database.status === "connected" && services.llm.status === "connected";
   const overallStatus = isHealthy ? "healthy" : (services.database.status === "connected" || services.llm.status === "connected" ? "degraded" : "unhealthy");
 
-  res.status(isHealthy ? 200 : 503).json({
+  // Always return 200 so the frontend can render per-service status.
+  // A 503 prevents the client from reading the response body in many fetch wrappers.
+  res.status(200).json({
     status: overallStatus,
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
