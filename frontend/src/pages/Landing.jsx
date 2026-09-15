@@ -175,6 +175,25 @@ export default function Landing({ navigate }) {
           </div>
         </header>
 
+        {/* Mobile dropdown menu */}
+        <div className={`mobile-menu ${isMenuOpen ? 'is-open' : ''}`}>
+          <a href="#problem" onClick={() => setIsMenuOpen(false)} className="mobile-menu-link">Problem</a>
+          <a href="#how-it-works" onClick={() => setIsMenuOpen(false)} className="mobile-menu-link">How it works</a>
+          <a href="#scenarios" onClick={() => setIsMenuOpen(false)} className="mobile-menu-link">Use cases</a>
+          <button
+            onClick={() => { setIsMenuOpen(false); navigate(isAuthenticated ? '/dashboard' : '/login'); }}
+            className="mobile-menu-link mobile-login"
+          >
+            Log in
+          </button>
+          <button
+            onClick={() => { setIsMenuOpen(false); navigate('/signup'); }}
+            className="mobile-menu-link mobile-signup"
+          >
+            Sign up
+          </button>
+        </div>
+
         {/* SECTION 1: HERO */}
         <section className="bg-[#fbfaf6] pt-4 pb-16 px-6 lg:px-16 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center min-h-[calc(100vh-48px)]">
           {/* Left Column */}
