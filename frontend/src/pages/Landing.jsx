@@ -130,13 +130,10 @@ export default function Landing({ navigate }) {
   }, []);
 
   return (
-    <div className="min-h-screen w-full bg-[#fbfaf6] text-[#0f172a] antialiased overflow-x-hidden selection:bg-[#174f43] selection:text-white">
+    <div className="min-h-screen w-full bg-[#fbfaf6] text-[#0f172a] antialiased selection:bg-[#174f43] selection:text-white pt-12">
 
-      {/* GLOBAL WRAPPER FOR VERTICAL LINES */}
-      <div className="max-w-[1440px] mx-auto border-x border-slate-200 min-h-screen relative bg-[#fbfaf6]">
-
-        {/* NAVBAR */}
-        <header className="sticky top-0 z-50 w-full bg-white border-b border-slate-200">
+      {/* NAVBAR - Fixed */}
+      <header className="fixed top-0 left-0 right-0 z-50 w-full bg-white border-b border-slate-200">
           <div className="h-12 flex items-center">
 
             {/* Logo Section */}
@@ -161,7 +158,7 @@ export default function Landing({ navigate }) {
                 onClick={() => navigate(isAuthenticated ? '/dashboard' : '/login')}
                 className="h-full px-8 bg-[#174f43] hover:bg-[#143f36] text-white text-sm font-medium transition-colors flex items-center gap-2 cursor-pointer"
               >
-                Open workspace <span className="text-lg leading-none mt-[-2px]">›</span>
+                Open Workspace <span className="text-lg leading-none mt-[-2px]">›</span>
               </button>
             </div>
 
@@ -173,7 +170,10 @@ export default function Landing({ navigate }) {
               ☰
             </button>
           </div>
-        </header>
+      </header>
+
+      {/* GLOBAL WRAPPER FOR VERTICAL LINES */}
+      <div className="max-w-[1440px] mx-auto border-x border-slate-200 min-h-screen relative bg-[#fbfaf6]">
 
         {/* Mobile dropdown menu */}
         <div className={`mobile-menu ${isMenuOpen ? 'is-open' : ''}`}>
@@ -362,7 +362,7 @@ export default function Landing({ navigate }) {
             ].map((item, i) => (
               <div key={i} data-reveal-child className="bg-[#fbfaf6] p-6 lg:p-7 flex flex-col group hover:bg-white transition-colors duration-200">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-[clamp(1.5rem,3vw,2rem)] font-bold text-slate-200 leading-none select-none">
+                  <span className="text-[clamp(1.5rem,3vw,2rem)] font-bold text-[#174f43] leading-none select-none">
                     {item.step}
                   </span>
                   <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-[0.1em]">
