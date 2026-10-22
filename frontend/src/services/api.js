@@ -77,6 +77,18 @@ export const api = {
     return res.data;
   },
 
+  async demoLogin() {
+    const res = await request('/auth/demo', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    if (res.data?.token) {
+      authStorage.setToken(res.data.token);
+      authStorage.setUser(res.data.user);
+    }
+    return res.data;
+  },
+
   async getMe() {
     const res = await request('/auth/me', { method: 'GET' });
     if (res.data?.user) {

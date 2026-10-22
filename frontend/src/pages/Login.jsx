@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login({ navigate }) {
-  const { login } = useAuth();
+  const { login, demoLogin } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -122,10 +122,9 @@ export default function Login({ navigate }) {
           className="auth-demo-btn"
           disabled={loading}
           onClick={() => {
-            setFormData({ email: 'testuser@email.com', password: '123456' });
             setError('');
             setLoading(true);
-            login({ email: 'testuser@email.com', password: '123456' })
+            demoLogin()
               .then(() => navigate('/dashboard'))
               .catch((err) => {
                 setError(err.message || 'Demo login failed. Please try again.');

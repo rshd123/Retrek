@@ -146,6 +146,51 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// POST /api/auth/demo — Create-if-missing demo user and log in (for "Try Demo" button)
+const DEMO_EMAIL = "testuser@email.com";
+const DEMO_USERNAME = "testUser";
+const DEMO_PASSWORD = "123456";
+
+router.post("/demo", async (req, res) => {
+  try {
+    let { data: user, error: lookupError } = await supabase
+      .from("users")
+      .select("id, email, username, created_at")
+      .eq("email", DEMO_EMAIL)
+      .single();
+
+    if (lookupError && lookupError.code !== "PGRST116") {
+      throw new Error(lookupError.message);
+    }
+
+    if (!user) {
+      const password_hash = await hashPassword(DEMO_PASSWORD);
+      const { data: created, error: createError } = await supabase
+        .from("users")
+        .insert({
+          email: DEMO_EMAIL,
+          username: DEMO_USERNAME,
+          password_hash,
+        })
+        .select("id, email, username, created_at")
+        .single();
+
+      if (createError) throw new Error(createError.message);
+      user = created;
+    }
+
+    const token = generateToken(user);
+
+    res.json({
+      success: true,
+      message: "Demo session ready",
+      data: { user, token },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // GET /api/auth/me — Get profile of currently logged-in user
 router.get("/me", requireAuth, async (req, res) => {
   try {

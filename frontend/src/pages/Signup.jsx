@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Signup({ navigate }) {
-  const { signup } = useAuth();
+  const { signup, demoLogin } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -167,10 +167,10 @@ export default function Signup({ navigate }) {
           onClick={() => {
             setError('');
             setLoading(true);
-            signup({ email: 'testuser@email.com', username: 'testUser', password: '123456' })
+            demoLogin()
               .then(() => navigate('/dashboard'))
               .catch((err) => {
-                setError(err.message || 'Demo signup failed. Please try again.');
+                setError(err.message || 'Demo login failed. Please try again.');
                 setLoading(false);
               });
           }}

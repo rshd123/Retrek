@@ -118,6 +118,14 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  const demoLogin = async () => {
+    const data = await api.demoLogin();
+    setUser(data.user);
+    setToken(data.token);
+    authStorage.setLastActivity();
+    return data;
+  };
+
   const value = {
     user,
     token,
@@ -125,6 +133,7 @@ export function AuthProvider({ children }) {
     loading,
     login,
     signup,
+    demoLogin,
     logout,
   };
 
